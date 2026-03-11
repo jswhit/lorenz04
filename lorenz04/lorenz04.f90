@@ -1,14 +1,14 @@
 module lorenz04
 
-! reference implementation of Lorenz Model III from DART
+! reference fortran90 implementation of Lorenz Model III from DART
 
 implicit none
 private
 
 !> required routines with code in this module
 public :: static_init_model, &
-          adv_1step, &
-          comp_dt
+          timestep, &
+          gettend
 
 
 integer    :: model_size        = 960
@@ -16,10 +16,10 @@ real(8)    :: forcing           = 15.00
 real(8)    :: delta_t           = 0.001
 real(8)    :: space_time_scale  = 10.00
 real(8)    :: coupling          = 3.008
-integer     :: K                 = 32
-integer     :: smooth_steps      = 12
-integer     :: time_step_days    = 0
-integer     :: time_step_seconds = 3600
+integer    :: K                 = 32
+integer    :: smooth_steps      = 12
+integer    :: time_step_days    = 0
+integer    :: time_step_seconds = 3600
 
 !---------------------------------------------------------------- 
 ! Define some parameters for computational efficiency
@@ -27,7 +27,7 @@ integer  :: H
 integer  :: K2
 integer  :: K4
 integer  :: ss2
-real(8) :: sts2
+real(8)  :: sts2
 
 !---------------------------------------------------------------- 
 ! Define the averaging function for the production of x from z (L2k4)
@@ -40,7 +40,7 @@ subroutine static_init_model()
 real(8) :: x_loc
 real(8) :: ri
 real(8) :: alpha, beta
-integer  :: i, j
+integer :: i, j
 
 ! if K is even, H = K/2 and the first/last summation 
 ! terms are divided by 2.  if K is odd, H = (K-1)/2 and 
@@ -137,16 +137,16 @@ end subroutine static_init_model
 !>       c = coupling
 !>       K = K
 !>       J = smooth_steps
-subroutine comp_dt(z, dt) 
+subroutine gettend(z, dt) 
 
 real(8), intent( in)        ::  z(:)
-real(8), intent(out)        :: dt(:)
+real(8), intent(out)        :: dzdt(:)
 real(8), dimension(size(z)) :: x, y
 real(8)                     :: xwrap(- K4:model_size + K4)
 real(8)                     :: ywrap(- K4:model_size + K4)
 real(8)                     ::    wx(- K4:model_size + K4)
 real(8)                     :: xx
-integer                      :: i, j
+integer                     :: i, j
 
 
 call z2xy(z,x,y)
@@ -190,14 +190,14 @@ do i = 1, model_size
    xx = xx + wx(i - K + H)*xwrap(i + K + H)/2.00
    xx = - wx(i - K2)*wx(i - K) + xx/K
       
-   dt(i) = xx + (sts2)*( - ywrap(i - 2)*ywrap(i - 1) &
+   dzdt(i) = xx + (sts2)*( - ywrap(i - 2)*ywrap(i - 1) &
        + ywrap(i - 1)*ywrap(i + 1)) + coupling*( - ywrap(i - 2)*xwrap(i - 1) &
        + ywrap(i - 1)*xwrap(i + 1)) - xwrap(i) - space_time_scale*ywrap(i) &
        + forcing
 
 end do
 
-end subroutine comp_dt
+end subroutine gettend
 
 !------------------------------------------------------------------
 !> Decomposes z into x and y for L2k4
@@ -242,26 +242,26 @@ end subroutine z2xy
 !> Does single time step advance for lorenz 04 model
 !> using four-step rk time step
 
-subroutine adv_1step(x)
+subroutine timestep(x)
 
 real(8), intent(inout) :: x(:)
 
 real(8), dimension(size(x)) :: x1, x2, x3, x4, dx, inter
 real(8), dimension(size(x)) :: dxt
 
-call comp_dt(x, dx)    !  Compute the first intermediate step
+call gettend(x, dx)    !  Compute the first intermediate step
 x1    = delta_t * dx
 inter = x + x1 / 2.0
 
-call comp_dt(inter, dx)!  Compute the second intermediate step
+call gettend(inter, dx)!  Compute the second intermediate step
 x2    = delta_t * dx
 inter = x + x2 / 2.0
 
-call comp_dt(inter, dx)!  Compute the third intermediate step
+call gettend(inter, dx)!  Compute the third intermediate step
 x3    = delta_t * dx
 inter = x + x3
 
-call comp_dt(inter, dx)!  Compute fourth intermediate step
+call gettend(inter, dx)!  Compute fourth intermediate step
 x4 = delta_t * dx
 
 !  Compute new value for x
@@ -269,6 +269,6 @@ x4 = delta_t * dx
 dxt = x1/6.0 + x2/3.0 + x3/3.0 + x4/6.0
 x = x + dxt
 
-end subroutine adv_1step
+end subroutine timestep
 
 end module lorenz04
