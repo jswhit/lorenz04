@@ -18,17 +18,11 @@ hcovlocal_scale = float(sys.argv[1])
 
 profile = False # turn on profiling?
 
-# if savedata not None, netcdf filename will be defined by env var 'exptname'
-# if savedata = 'restart', only last time is saved (so expt can be restarted)
-#savedata = True
-#savedata = 'restart'
+# if savedata not None, netcdf data will be saved with filename 'savedata'
 savedata = None
-#nassim = 101
-#nassim_spinup = 100
+#savedata = 'lgetkfcv_local%s.nc' % hcovlocal_scale
 nassim = 1320  # assimilation times to run
 nassim_spinup = 120
-nassim = 10
-nassim_spinup = 5
 
 nanals = 10 # ensemble members
 nerger = True # use Nerger regularization for R localization
@@ -96,7 +90,36 @@ for nanal in range(nanals):
 
 # initialize output file.
 if savedata is not None:
-   raise ValueError('saving ensemble data not yet implemented')
+   nc = Dataset(savedata, mode='w', format='NETCDF4_CLASSIC')
+   nc.model_size = models[0].model_size
+   nc.forcing = models[0].forcing
+   nc.dt = models[0].dt
+   nc.space_time_scale = models[0].space_time_scale
+   nc.coupling = models[0].coupling
+   nc.K = models[0].K
+   nc.smooth_steps = models[0].smooth_steps
+   nc.nanals = nanals
+   nc.hcovlocal_scale = hcovlocal_scale
+   nc.oberrstdev = oberrstdev
+   nc.dt = models[0].dt
+   nc.filename_climo = filename_climo
+   nc.filename_truth = filename_truth
+   xdim = nc.createDimension('x',models[0].model_size)
+   obs = nc.createDimension('obs',nobs)
+   ens = nc.createDimension('ens',nanals)
+   z_t =\
+   nc.createVariable('z_t',np.float32,('t','x'),zlib=True)
+   z_b =\
+   nc.createVariable('z_b',np.float32,('t','ens','x'),zlib=True)
+   z_a =\
+   nc.createVariable('z_a',np.float32,('t','ens','x'),zlib=True)
+   z_obs = nc.createVariable('obs',np.float32,('t','obs'))
+   x_obs = nc.createVariable('x_obs',np.float32,('t','obs'))
+   xvar = nc.createVariable('x',np.float32,('x',))
+   tvar = nc.createVariable('t',np.float32,('t',))
+   ensvar = nc.createVariable('ens',np.int32,('ens',))
+   xvar[:] = np.arange(0,models[0].model_size)
+   ensvar[:] = np.arange(1,nanals+1)
 
 # initialize kinetic energy error/spread spectra
 zspec_errmean = None; zspec_sprdmean = None
@@ -143,7 +166,10 @@ for ntime in range(nassim):
     zsprd_b = ((zensmean_b-zens)**2).sum(axis=0)/(nanals-1)
 
     if savedata is not None:
-        pass
+        z_t[ntime] = z_truth[ntime+ntstart]
+        z_b[ntime,:,:] = zens
+        z_obs[ntime] = zob
+        x_obs[ntime] = xob
 
     # EnKF update
     zens = lgetkf(zens,hxens,zob,oberrvar,covlocal_tmp,nerger=nerger,ngroups=ngroups)
@@ -163,7 +189,9 @@ for ntime in range(nassim):
 
     # save data.
     if savedata is not None:
-        pass
+        z_a[ntime,:,:] = zens
+        tvar[ntime] = obtimes[ntime+ntstart]
+        nc.sync()
 
     # run forecast ensemble to next analysis time
     t1 = time.time()
@@ -192,7 +220,7 @@ for ntime in range(nassim):
                zspec_sprdmean = zspec_sprdmean+zpertspec_mag
        ncount += 1
 
-#if savedata: nc.close()
+#if savedata is not None: nc.close()
 
 if ncount:
     zspec_sprdmean = zspec_sprdmean/ncount
