@@ -27,6 +27,8 @@ savedata = None
 #nassim_spinup = 100
 nassim = 1320  # assimilation times to run
 nassim_spinup = 120
+nassim = 10
+nassim_spinup = 5
 
 nanals = 10 # ensemble members
 nerger = True # use Nerger regularization for R localization
@@ -173,45 +175,34 @@ for ntime in range(nassim):
         raise SystemExit('non-finite values detected after forecast, stopping...')
 
     # compute spectra of error and spread
-    #f ntime >= nassim_spinup:
-    #   pvfcstmean = pvens.mean(axis=0)
-    #   pverrspec = scalefact*rfft2(pvfcstmean - pv_truth[ntime+ntstart+1])
-    #   pverrspec_mag = (pverrspec*np.conjugate(pverrspec)).real
-    #   if pvspec_errmean is None:
-    #       pvspec_errmean = pverrspec_mag
-    #   else:
-    #       pvspec_errmean = pvspec_errmean + pverrspec_mag
-    #   for nanal in range(nanals):
-    #       pvpertspec = scalefact*rfft2(pvens[nanal] - pvfcstmean)
-    #       pvpertspec_mag = (pvpertspec*np.conjugate(pvpertspec)).real/(nanals-1)
-    #       if pvspec_sprdmean is None:
-    #           pvspec_sprdmean = pvpertspec_mag
-    #       else:
-    #           pvspec_sprdmean = pvspec_sprdmean+pvpertspec_mag
-    #   ncount += 1
+    if ntime >= nassim_spinup:
+       zfcstmean = zens.mean(axis=0)
+       zerrspec = np.fft.rfft(zfcstmean - z_truth[ntime+ntstart+1])
+       zerrspec_mag = (zerrspec*np.conjugate(zerrspec)).real
+       if zspec_errmean is None:
+           zspec_errmean = zerrspec_mag
+       else:
+           zspec_errmean = zspec_errmean + zerrspec_mag
+       for nanal in range(nanals):
+           zpertspec = np.fft.rfft(zens[nanal] - zfcstmean)
+           zpertspec_mag = (zpertspec*np.conjugate(zpertspec)).real/(nanals-1)
+           if zspec_sprdmean is None:
+               zspec_sprdmean = zpertspec_mag
+           else:
+               zspec_sprdmean = zspec_sprdmean+zpertspec_mag
+       ncount += 1
 
 #if savedata: nc.close()
 
-#if ncount:
-#    pvspec_sprdmean = pvspec_sprdmean/ncount
-#    pvspec_errmean = pvspec_errmean/ncount
-#    pvspec_err = np.zeros(ktotmax,np.float64)
-#    pvspec_sprd = np.zeros(ktotmax,np.float64)
-#    for i in range(pvspec_errmean.shape[2]):
-#        for j in range(pvspec_errmean.shape[1]):
-#            totwavenum = int(np.round(ktot[j,i]))
-#            if totwavenum < ktotmax:
-#                pvspec_err[totwavenum] = pvspec_err[totwavenum] +\
-#                pvspec_errmean[:,j,i].mean(axis=0) # average of upper/lower boundary
-#                pvspec_sprd[totwavenum] = pvspec_sprd[totwavenum] +\
-#                pvspec_sprdmean[:,j,i].mean(axis=0)
-#
-#    print('# mean error/spread',pvspec_errmean.sum(), pvspec_sprdmean.sum())
-#    plt.figure()
-#    wavenums = np.arange(ktotmax,dtype=np.float64)
-#    for n in range(1,ktotmax):
-#        print('# ',wavenums[n],pvspec_err[n],pvspec_sprd[n])
-#    plt.loglog(wavenums[1:-1],pvspec_err[1:-1],color='r')
-#    plt.loglog(wavenums[1:-1],pvspec_sprd[1:-1],color='b')
-#    plt.title('error (red) and spread (blue) l=%s' % hcovlocal_km)
-#    plt.savefig('errorspread_spectra_cv_%s.png' % exptname)
+if ncount:
+    zspec_sprdmean = zspec_sprdmean/ncount
+    zspec_errmean = zspec_errmean/ncount
+    print('# mean error/spread',zspec_errmean.sum(), zspec_sprdmean.sum())
+    plt.figure()
+    wavenums = np.arange(kmax,dtype=np.float64)
+    for n in range(1,kmax):
+        print('# ',wavenums[n],zspec_errmean[n],zspec_sprdmean[n])
+    plt.loglog(wavenums,zspec_errmean,color='r')
+    plt.loglog(wavenums,zspec_sprdmean,color='b')
+    plt.title('error (red) and spread (blue) l=%s' % hcovlocal_scale)
+    plt.savefig('errorspread_spectra_cv_local%s.png' % hcovlocal_scale)
