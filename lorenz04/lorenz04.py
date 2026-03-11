@@ -170,13 +170,11 @@ if __name__ == "__main__":
     print(t2-t1,'seconds to run spinup')
     zsave = np.empty((nspinup,model.model_size),np.float64)
     for n in range(nspinup):
-        z = model.timestep()
-        zsave[n] = z
+        zsave[n] = model.timestep()
     zmean = zsave.mean(axis=0)
     zprime = zsave - zmean
     print('mean = ',zmean.mean())
     print('stdev = ',np.sqrt((zprime**2).sum(axis=0)/(nspinup-1)).mean())
-    raise SystemExit
 
     windowsteps = 24 # plot every windowsteps time steps
 
