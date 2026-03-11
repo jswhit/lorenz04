@@ -192,14 +192,12 @@ for ntime in range(nassim):
     else:
         zens_filtered_lst=[]
         zfilt_save = np.zeros_like(zprime)
-        zspec = numpy.fft.rfft(zprime)
-        raise SystemExit
-        wavenums = models[0].wavenums[np.newaxis,np.newaxis,...]
+        zspec = np.fft.rfft(zprime)
         for n,cutoff in enumerate(band_cutoffs):
-            #filtfact = np.exp(-(wavenums/cutoff)**8)
+            #filtfact = np.exp(-(wavenums[np.newaxis,...]/cutoff)**8)
             #zfiltspec = filtfact*zspec
-            zfiltspec = np.where(wavenums < cutoff, zspec, 0.+0.j)
-            zfilt = numpy.fft.rfft2(zfiltspec)
+            zfiltspec = np.where(wavenums[np.newaxis,...] < cutoff, zspec, 0.+0.j)
+            zfilt = np.fft.irfft(zfiltspec)
             zens_filtered_lst.append(zfilt-zfilt_save)
             #plt.figure()
             #plt.plot(x,(zfilt-zfilt_save)[0,...])
