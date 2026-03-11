@@ -84,7 +84,7 @@ print('# band_cutoffs=%s crossbandcov_facts=%s' % (repr(band_cutoffs),repr(cross
 
 # each ob time nobs ob locations are randomly sampled (without
 # replacement) from the model grid
-nobs = nx//10
+nobs = nx//4
 
 # nature run
 nc_truth = Dataset(filename_truth)
@@ -198,7 +198,9 @@ for ntime in range(nassim):
             zfiltspec = np.where(wavenums[np.newaxis,...] < cutoff, zspec, 0.+0.j)
             if len(band_cutoffs) == 1 and cutoff == 999:
                 # for 2 scales and band_cutoff=999, use model filter
-                zfilt, _ = models[0].z2xy(zprime)
+                zfilt = np.empty_like(zens)
+                for nanal in range(nanals):
+                    zfilt[nanal], _ = models[nanal].z2xy(zprime[nanal])
             else:
                 #filtfact = np.exp(-(wavenums[np.newaxis,...]/cutoff)**8)
                 #zfiltspec = filtfact*zspec
