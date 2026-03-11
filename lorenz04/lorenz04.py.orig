@@ -1,0 +1,202 @@
+import numpy as np
+
+class Lorenz04:
+    def __init__(
+        self,
+        z = None,
+        model_size: int = 960,
+        forcing: float = 14.00,
+        dt: float = 0.05/24,
+        space_time_scale: float = 1.00,
+        coupling: float = 0.37,
+        K: int = 32,
+        smooth_steps: int = 12
+    ):
+        self.model_size = model_size
+        self.forcing = forcing
+        self.dt = dt
+        self.space_time_scale = space_time_scale
+        self.coupling = coupling
+        self.K = K
+        self.smooth_steps = smooth_steps
+
+        if (K + 1) // 2 != K // 2:
+            raise ValueError("Model only handles even values of K")
+
+        alpha = (3.0 * smooth_steps**2 + 3.0) / (2.0 * smooth_steps**3 + 4.0 * smooth_steps)
+        beta  = (2.0 * smooth_steps**2 + 1.0) / (smooth_steps**4 + 2.0 * smooth_steps**2)
+
+        self.a = np.array([alpha - beta * abs(i)
+                           for i in range(-smooth_steps, smooth_steps + 1)])
+
+        self.H    = K // 2
+        self.K2   = 2 * K
+        self.K4   = 4 * K
+        self.ss2  = 2 * smooth_steps
+        self.sts2 = self.space_time_scale ** 2
+        self.z = None
+        self.t = 0
+
+        # Build a (model_size, 2*smooth_steps+1) matrix of shifted z values.
+        # Row i contains zw[i], zw[i+1], ..., zw[i + 2*smooth_steps]
+        # which corresponds to zwrap(i - smooth_steps .. i + smooth_steps)
+        # in reversed order to match Fortran's zwrap(i - j) for j = -ss..ss.
+        N = self.model_size
+        n_taps = 2 * smooth_steps + 1
+        # Each column k gives zw shifted by k; we want shifts corresponding to
+        # j = smooth_steps down to -smooth_steps  (i.e. zwrap(i-j) for j=-ss..ss)
+        self._idx = np.arange(N)[:, None] + np.arange(n_taps)[None, :]  # (N, n_taps)
+        # ---- Compute W (wx) via vectorised sumprime ----
+        # For each i, wx(i) = sumprime_{j=-H}^{H} xw(i-j) / K
+        # = sumprime over shifts +H down to -H
+        # Build index matrix: row i, column k -> xw[self.K4 + i - (H - k)] for k=0..2H
+        n_taps = 2 * self.H + 1
+        i_idx = np.arange(N)[:, None]            # (N, 1)
+        j_vals = np.arange(-self.H, self.H + 1)[None, :]   # (1, 2H+1);  j = -H..H
+        # xwrap(i - j) in 0-based wrapped array: offset + i - j
+        self._col_idx = self.K4 + i_idx - j_vals             # (N, 2H+1)
+
+    def _wrap(self, arr: np.ndarray, halo: int) -> np.ndarray:
+        """Wrap a 1-D array of length model_size with periodic halos of size `halo`."""
+        return np.concatenate([arr[-halo:], arr, arr[:halo]])
+
+    def z2xy(self, z: np.ndarray):
+        smooth_steps = self.smooth_steps
+        a = self.a                          # shape (2*smooth_steps+1,)
+
+        # Wrap z with halo of smooth_steps on each side
+        zw = self._wrap(z, smooth_steps)    # shape (model_size + 2*smooth_steps,)
+
+        Z = zw[self._idx]           # (N, n_taps); column k = zwrap[i + k] = zwrap(i - j) with j=ss-k
+
+        # sumprime weights: halve first and last tap
+        w = a.copy()
+        w[0]  *= 0.5
+        w[-1] *= 0.5
+
+        x = Z @ w             # (N,) — vectorised sumprime convolution
+        y = z - x
+        return x, y
+
+    def gettend(self, z: np.ndarray) -> np.ndarray:
+        N  = self.model_size
+        K  = self.K
+        K2 = self.K2
+        K4 = self.K4
+        H  = self.H
+
+        x, y = self.z2xy(z)
+
+        # Wrap x and y with halo K4
+        xw = self._wrap(x, K4)   # length N + 2*K4; index offset = K4
+        yw = self._wrap(y, K4)
+
+        # ---- Compute W (wx) via vectorised sumprime ----
+        X_mat = xw[self._col_idx]                       # (N, 2H+1)
+
+        # sumprime weights (halve j=-H and j=+H columns, i.e. first and last)
+        n_taps = 2 * self.H + 1
+        wp = np.ones(n_taps)
+        wp[0]  = 0.5
+        wp[-1] = 0.5
+
+        wx_inner = X_mat @ wp / K                 # (N,)
+
+        # Wrap wx with halo K4
+        wxw = self._wrap(wx_inner, K4)
+
+        # ---- Compute the [X,X]_K bracket (xx term) ----
+        # xx_i = sumprime_{j=-H}^{H} wx(i-K+j) * xw(i+K+j) / K  -  wx(i-2K)*wx(i-K)
+        i_idx = np.arange(N)[:, None]
+        j_vals = np.arange(-H, H + 1)[None, :]
+
+        wx_idx  = K4 + i_idx - K + j_vals    # indices into wxw  for wx(i-K+j)
+        xw_idx  = K4 + i_idx + K + j_vals    # indices into xw   for xw(i+K+j)
+
+        WX_mat = wxw[wx_idx]                  # (N, 2H+1)
+        XW_mat = xw[xw_idx]                  # (N, 2H+1)
+
+        prod = WX_mat * XW_mat               # (N, 2H+1)
+        prod[:, 0]  *= 0.5                   # sumprime: halve first term
+        prod[:, -1] *= 0.5                   # sumprime: halve last term
+
+        i_idx_1d = np.arange(N)
+        xx = prod.sum(axis=1) / K \
+             - wxw[K4 + i_idx_1d - K2] * wxw[K4 + i_idx_1d - K]   # (N,)
+
+        # ---- Assemble dz/dt ----
+        i_idx_1d = np.arange(N)
+        o = K4   # offset into wrapped arrays
+
+        dzdt = (
+            xx
+            + self.sts2 * (-yw[o + i_idx_1d - 2] * yw[o + i_idx_1d - 1]
+                           + yw[o + i_idx_1d - 1] * yw[o + i_idx_1d + 1])
+            + self.coupling * (-yw[o + i_idx_1d - 2] * xw[o + i_idx_1d - 1]
+                               + yw[o + i_idx_1d - 1] * xw[o + i_idx_1d + 1])
+            - xw[o + i_idx_1d]
+            - self.space_time_scale * yw[o + i_idx_1d]
+            + self.forcing
+        )
+
+        return dzdt
+
+    def timestep(self):
+        dt = self.dt
+        x = self.z.copy()
+
+        dx = self.gettend(x);       x1 = dt * dx
+        dx = self.gettend(x + x1 / 2.0); x2 = dt * dx
+        dx = self.gettend(x + x2 / 2.0); x3 = dt * dx
+        dx = self.gettend(x + x3);        x4 = dt * dx
+
+        self.z += x1 / 6.0 + x2 / 3.0 + x3 / 3.0 + x4 / 6.0
+        self.t += self.dt
+        return self.z
+
+    def advance(self, timesteps=1, z=None):
+        # advance forward specified number of timesteps
+        if z is not None:
+            self.z = z
+        for _ in range(timesteps):
+            z = self.timestep()
+        return z
+
+# ------------------------------------------------------------------
+# Example usage
+# ------------------------------------------------------------------
+if __name__ == "__main__":
+    model = Lorenz04()
+
+    # random initial condition
+    model.z = np.full(model.model_size, model.forcing) + np.random.uniform(-1,1,size=model.model_size)
+    # spinup
+    nspinup = 12000 # 25 time units if dt=0.05/24
+    import time
+    t1 = time.time()
+    for _ in range(nspinup):
+        z = model.timestep()
+    t2 = time.time()
+    print(t2-t1,'seconds to run spinup')
+
+    windowsteps = 24 # plot every windowsteps time steps
+
+    # plot animation
+    import matplotlib
+    matplotlib.use('qtagg')
+    import matplotlib.pyplot as plt
+    import matplotlib.animation as animation
+    fig = plt.figure(figsize=(10,6))
+    ax = plt.gca()
+    x = np.arange(model.model_size)
+    line = ax.plot(x,z)[0]
+    ax.set_ylim(-20,20)
+
+    def updatefig(*args):
+        z = model.advance(timesteps=windowsteps)
+        line.set_ydata(z)
+        return line
+    
+    # interval=0 means draw as fast as possible
+    ani = animation.FuncAnimation(fig, updatefig, frames=500, interval=10, repeat=False)
+    plt.show()
