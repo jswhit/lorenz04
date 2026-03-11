@@ -1,9 +1,9 @@
 import matplotlib
-matplotlib.use('Agg')
+matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from netCDF4 import Dataset
-import sys, time
+import sys, time, os
 from lorenz04 import Lorenz04, cartdist, lgetkf_ms, gaspcohn
 
 if len(sys.argv) == 1:
@@ -37,7 +37,8 @@ profile = False # turn on profiling?
 
 # if savedata not None, netcdf data will be saved with filename 'savedata'
 savedata = None
-#savedata = 'lgetkfcv_local%s.nc' % hcovlocal_scale
+exptname = os.getenv('exptname','test')
+#savedata = 'lgetkfcv_%s.nc' % exptname
 nassim = 1320  # assimilation times to run
 nassim_spinup = 120
 
@@ -198,6 +199,7 @@ for ntime in range(nassim):
             #zfiltspec = filtfact*zspec
             zfiltspec = np.where(wavenums[np.newaxis,...] < cutoff, zspec, 0.+0.j)
             zfilt = np.fft.irfft(zfiltspec)
+            #y, zfilt = models[0].z2xy(zprime) # use model filter
             zens_filtered_lst.append(zfilt-zfilt_save)
             #plt.figure()
             #plt.plot(x,(zfilt-zfilt_save)[0,...])
@@ -206,9 +208,9 @@ for ntime in range(nassim):
         zsum = np.zeros_like(zprime)
         for n in range(nband_cutoffs):
             zsum += zens_filtered_lst[n]
+        zens_filtered_lst.append(zprime-zsum)
         #plt.plot(x,(zprime-zsum)[0,...])
         #plt.title('scale = %s' % nlscales)
-        zens_filtered_lst.append(zprime-zsum)
         #plt.show()
         #raise SystemExit
     zens_filtered = np.asarray(zens_filtered_lst)
@@ -291,5 +293,5 @@ if ncount:
         print('# ',wavenums[n],zspec_errmean[n],zspec_sprdmean[n])
     plt.loglog(wavenums,zspec_errmean,color='r')
     plt.loglog(wavenums,zspec_sprdmean,color='b')
-    plt.title('error (red) and spread (blue) l=%s' % hcovlocal_scale)
-    plt.savefig('errorspread_spectra_cv_local%s.png' % hcovlocal_scale)
+    plt.title('error (red) and spread (blue) %s' % exptname)
+    plt.savefig('errorspread_spectra_cv_%s.png' % exptname)
