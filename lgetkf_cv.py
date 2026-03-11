@@ -3,7 +3,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from netCDF4 import Dataset
-import sys, time, os
+import sys, time
 from lorenz04 import Lorenz04, cartdist, lgetkf, gaspcohn
 
 if len(sys.argv) == 1:
@@ -105,6 +105,7 @@ if savedata is not None:
    nc.filename_climo = filename_climo
    nc.filename_truth = filename_truth
    xdim = nc.createDimension('x',models[0].model_size)
+   tdim = nc.createDimension('t',None)
    obs = nc.createDimension('obs',nobs)
    ens = nc.createDimension('ens',nanals)
    z_t =\
