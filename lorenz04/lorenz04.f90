@@ -1,5 +1,7 @@
 module lorenz04
 
+! reference implementation of Lorenz Model III from DART
+
 implicit none
 private
 
@@ -81,12 +83,6 @@ end subroutine static_init_model
 !>
 !> The model equations are given by
 !> 
-!> Model 2 (II)
-!>      dX_i
-!>      ---- = [X,X]_{K,i} -  X_i + F 
-!>       dt                
-!>                         
-!>
 !> Model 3 (III)
 !>      dZ_i
 !>      ---- = [X,X]_{K,i} + b^2 (-Y_{i-2}Y_{i-1} + Y_{i-1}Y_{i+1})
@@ -108,7 +104,7 @@ end subroutine static_init_model
 !> of summation are replaced by (K-1)/2. THIS CODE ONLY IMPLEMENTS THE
 !> K EVEN SOLUTION!!!
 !>
-!> The variable that is integrated is X (model II) or Z (model III), 
+!> The variable that is integrated is Z,
 !> but the integration of Z requires
 !> the variables X and Y.  For model III they are obtained by
 !>
