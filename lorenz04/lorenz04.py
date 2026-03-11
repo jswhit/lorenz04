@@ -1,9 +1,11 @@
 import numpy as np
 
+# parameters from Harty et al (https://doi.org/10.1080/16000870.2021.1903692)
+
 # Parameter	Nz	K	I	F	b	c
-#This work	960	32	12	14	1	0.37
-#Lorenz 	960	32	12	15	1	2.5
-# b-> space_time_scale
+# Harty et al	960	32	12	14	1	0.37
+# Lorenz 	960	32	12	15	1	2.5
+# where b-> space_time_scale, c-> coupling, F-> forcing, I-> smooth_steps
 
 class Lorenz04:
     def __init__(
