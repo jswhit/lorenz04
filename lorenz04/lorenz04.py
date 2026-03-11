@@ -158,15 +158,24 @@ if __name__ == "__main__":
     model = Lorenz04()
 
     # random initial condition
-    model.z = np.full(model.model_size, model.forcing) + np.random.uniform(-1,1,size=model.model_size)
+    rs = np.random.RandomState(42)
+    model.z = np.full(model.model_size, model.forcing) + rs.uniform(-1,1,size=model.model_size)
     # spinup
     nspinup = 12000 # 25 time units if dt=0.05/24
     import time
     t1 = time.time()
-    for _ in range(nspinup):
+    for n in range(nspinup):
         z = model.timestep()
     t2 = time.time()
     print(t2-t1,'seconds to run spinup')
+    zsave = np.empty((nspinup,model.model_size),np.float64)
+    for n in range(nspinup):
+        z = model.timestep()
+        zsave[n] = z
+    zmean = zsave.mean(axis=0)
+    zprime = zsave - zmean
+    print('mean = ',zmean.mean())
+    print('stdev = ',np.sqrt((zprime**2).sum(axis=0)/(nspinup-1)).mean())
     raise SystemExit
 
     windowsteps = 24 # plot every windowsteps time steps
