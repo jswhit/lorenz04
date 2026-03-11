@@ -195,11 +195,15 @@ for ntime in range(nassim):
         zfilt_save = np.zeros_like(zprime)
         zspec = np.fft.rfft(zprime)
         for n,cutoff in enumerate(band_cutoffs):
-            #filtfact = np.exp(-(wavenums[np.newaxis,...]/cutoff)**8)
-            #zfiltspec = filtfact*zspec
             zfiltspec = np.where(wavenums[np.newaxis,...] < cutoff, zspec, 0.+0.j)
-            zfilt = np.fft.irfft(zfiltspec)
-            #y, zfilt = models[0].z2xy(zprime) # use model filter
+            if len(band_cutoffs) == 1 and cutoff == 999:
+                # for 2 scales and band_cutoff=999, use model filter
+                zfilt, _ = models[0].z2xy(zprime)
+            else:
+                #filtfact = np.exp(-(wavenums[np.newaxis,...]/cutoff)**8)
+                #zfiltspec = filtfact*zspec
+                zfiltspec = np.where(wavenums[np.newaxis,...] < cutoff, zspec, 0.+0.j)
+                zfilt = np.fft.irfft(zfiltspec)
             zens_filtered_lst.append(zfilt-zfilt_save)
             #plt.figure()
             #plt.plot(x,(zfilt-zfilt_save)[0,...])
