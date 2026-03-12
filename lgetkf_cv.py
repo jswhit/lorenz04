@@ -63,9 +63,11 @@ for nanal in range(nanals):
 print("# hcovlocal=%g nanals=%s ngroups=%s" %\
         (hcovlocal_scale,nanals,ngroups))
 
-# each ob time nobs ob locations are randomly sampled (without
+# if fixednetwork=True, every nx//nobs grid point is observed.
+# otherwise, each ob time nobs ob locations are randomly sampled (without
 # replacement) from the model grid
-nobs = nx//10
+fixednetwork = True
+nobs = nx//4
 
 # nature run
 nc_truth = Dataset(filename_truth)
@@ -138,8 +140,12 @@ for ntime in range(nassim):
         (models[0].t, obtimes[ntime+ntstart]))
 
     t1 = time.time()
-    indxob = np.sort(rsobs.choice(nx,nobs,replace=False))
-    zob = z_truth[ntime+ntstart,...][indxob]
+    if fixednetwork:
+        nskip = nx//nobs
+        indxob = np.arange(nx)[::nskip]
+    else:
+        indxob = np.sort(rsobs.choice(nx,nobs,replace=False))
+    zob = z_truth[ntime+ntstart,indxob]
     zob += rsobs.normal(scale=oberrstdev,size=nobs) # add ob errors
     xob = x[indxob]
     # compute covariance localization function for each ob
@@ -159,7 +165,7 @@ for ntime in range(nassim):
     hxens = np.empty((nanals,nobs),np.float64)
 
     for nanal in range(nanals):
-        hxens[nanal] = zens[nanal,...][indxob] 
+        hxens[nanal] = zens[nanal,indxob]
     hxensmean_b = hxens.mean(axis=0)
     zensmean_b = zens.mean(axis=0).copy()
     zerr_b = (zensmean_b-z_truth[ntime+ntstart])**2
