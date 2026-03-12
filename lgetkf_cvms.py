@@ -82,15 +82,20 @@ print("# hcovlocal_scales=%s nanals=%s ngroups=%s" %\
         (repr(hcovlocal_scales),nanals,ngroups))
 print('# band_cutoffs=%s crossbandcov_facts=%s' % (repr(band_cutoffs),repr(crossbandcov_facts)))
 
-# each ob time nobs ob locations are randomly sampled (without
+# if fixednetwork=True, every nx//nobs grid point is observed.
+# otherwise, each ob time nobs ob locations are randomly sampled (without
 # replacement) from the model grid
-nobs = nx//4
+fixednetwork = False
+nobs = nx//12
 
 # nature run
 nc_truth = Dataset(filename_truth)
 z_truth = nc_truth.variables['z']
 # set up arrays for obs and localization function
-print('# random network nobs = %s' % nobs)
+if fixednetwork:
+    print('# fixed network nobs = %s' % nobs)
+else:
+    print('# random network nobs = %s' % nobs)
 
 oberrvar = oberrstdev**2*np.ones(nobs,np.float64)
 covlocal = np.empty(nx,np.float64)
@@ -159,8 +164,12 @@ for ntime in range(nassim):
         (models[0].t, obtimes[ntime+ntstart]))
 
     t1 = time.time()
-    indxob = np.sort(rsobs.choice(nx,nobs,replace=False))
-    zob = z_truth[ntime+ntstart,...][indxob]
+    if fixednetwork:
+        nskip = nx//nobs
+        indxob = np.arange(nx)[::nskip]
+    else:
+        indxob = np.sort(rsobs.choice(nx,nobs,replace=False))
+    zob = z_truth[ntime+ntstart,indxob]
     zob += rsobs.normal(scale=oberrstdev,size=nobs) # add ob errors
     xob = x[indxob]
     # compute covariance localization function for each ob
@@ -181,11 +190,18 @@ for ntime in range(nassim):
     hxens = np.empty((nanals,nobs),np.float64)
 
     for nanal in range(nanals):
-        hxens[nanal] = zens[nanal][indxob] 
+        hxens[nanal] = zens[nanal,indxob] 
     hxensmean_b = hxens.mean(axis=0)
+    hxprime_orig = hxens - hxensmean_b
     zensmean_b = zens.mean(axis=0).copy()
     zerr_b = (zensmean_b-z_truth[ntime+ntstart])**2
     zsprd_b = ((zensmean_b-zens)**2).sum(axis=0)/(nanals-1)
+
+    if savedata is not None:
+        z_t[ntime] = z_truth[ntime+ntstart]
+        z_b[ntime,:,:] = zens
+        z_obs[ntime] = zob
+        x_obs[ntime] = xob
 
     # filter background perturbations into different scale bands
     if nlscales == 1:
@@ -220,33 +236,21 @@ for ntime in range(nassim):
         #plt.show()
         #raise SystemExit
     zens_filtered = np.asarray(zens_filtered_lst)
-    zens = np.dot(zens_filtered.T,crossband_covmat).T
-    zens += zensmean_b  # mean added back to all scales.
+    zprime = np.dot(zens_filtered.T,crossband_covmat).T
 
-    if savedata is not None:
-        z_t[ntime] = z_truth[ntime+ntstart]
-        z_b[ntime,:,:] = zens
-        z_obs[ntime] = zob
-        x_obs[ntime] = xob
-
-    xens = zens.reshape(nlscales*nanals,nx)
-    xprime = xens - xens.mean(axis=0)
     hxprime = np.empty((nanals*nlscales,nobs),np.float32)
+    xprime = zprime.reshape(nanals*nlscales, nx)
     for nanal in range(nanals*nlscales):
-        hxprime[nanal] = xprime[nanal][indxob] # surface pv obs
+        hxprime[nanal] = xprime[nanal,indxob] # surface pv obs
 
     # EnKF update
-    xens = lgetkf_ms(nlscales,xens,hxprime,zob-hxensmean_b,oberrvar,covlocal_tmp,ngroups=ngroups)
+    # (note zens contains unfiltered (original) ensemble, xprime has filtered perturbations separated into wave bands).
+    zens = lgetkf_ms(nlscales,zens,xprime,hxprime,hxprime_orig,zob-hxensmean_b,oberrvar,covlocal_tmp,ngroups=ngroups)
 
     t2 = time.time()
     if profile: print('cpu time for EnKF update',t2-t1)
 
-    zensmean_a = xens.mean(axis=0)
-
-    zens_filtered = xens - zensmean_a
-    zens_filtered = zens_filtered.reshape(nlscales,nanals,nx)
-    zprime = np.dot(zens_filtered.T,crossband_covmatr).T
-    zens = zprime.sum(axis=0) + zensmean_a
+    zensmean_a = zens.mean(axis=0)
 
     # print out analysis error, spread and innov stats for background
     zerr_a = (zensmean_a-z_truth[ntime+ntstart])**2

@@ -24,7 +24,7 @@ savedata = None
 nassim = 1320  # assimilation times to run
 nassim_spinup = 120
 
-nanals = 10 # ensemble members
+nanals = 8 # ensemble members
 nerger = True # use Nerger regularization for R localization
 ngroups = nanals  # number of groups for cross-validation (ngroups=nanals//n is "leave n out")
 
@@ -40,8 +40,8 @@ print('# filename_truth=%s' % filename_truth)
 
 # fix random seed for reproducibility.
 rsobs = np.random.RandomState(42) # fixed seed for observations
-rsics = np.random.RandomState() # varying seed for initial conditions
-#rsics = np.random.RandomState(24) # fixed seed for initial conditions
+#rsics = np.random.RandomState() # varying seed for initial conditions
+rsics = np.random.RandomState(24) # fixed seed for initial conditions
 
 # get model info
 nc_climo = Dataset(filename_climo)
@@ -66,14 +66,18 @@ print("# hcovlocal=%g nanals=%s ngroups=%s" %\
 # if fixednetwork=True, every nx//nobs grid point is observed.
 # otherwise, each ob time nobs ob locations are randomly sampled (without
 # replacement) from the model grid
-fixednetwork = True
-nobs = nx//4
+fixednetwork = False
+nobs = nx//12
 
 # nature run
 nc_truth = Dataset(filename_truth)
 z_truth = nc_truth.variables['z']
 # set up arrays for obs and localization function
-print('# random network nobs = %s' % nobs)
+if fixednetwork:
+    print('# fixed network nobs = %s' % nobs)
+else:
+    print('# random network nobs = %s' % nobs)
+
 
 oberrvar = oberrstdev**2*np.ones(nobs,np.float64)
 covlocal = np.empty(nx,np.float64)
