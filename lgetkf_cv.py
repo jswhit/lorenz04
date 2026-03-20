@@ -188,7 +188,6 @@ for ntime in range(nassim):
     if profile: print('cpu time for EnKF update',t2-t1)
 
     zensmean_a = zens.mean(axis=0)
-    zprime = zens-zensmean_a
 
     # print out analysis error, spread and innov stats for background
     zerr_a = (zensmean_a-z_truth[ntime+ntstart])**2

@@ -26,12 +26,10 @@ crossbandcov_facts = eval(sys.argv[3])
 if len(crossbandcov_facts) != nband_cutoffs:
     raise SystemExit('band_cutoffs and crossbandcov_facts should be same length')
 crossband_covmat = np.ones((nlscales,nlscales),np.float32)
-crossband_covmatr = np.ones((nlscales,nlscales),np.float32)
 for i in range(nlscales):
     for j in range(nlscales):
         if j != i:
             crossband_covmat[j,i] = crossbandcov_facts[np.abs(i-j)-1] 
-            crossband_covmatr[j,i] = -crossbandcov_facts[np.abs(i-j)-1] 
 
 profile = False # turn on profiling?
 
