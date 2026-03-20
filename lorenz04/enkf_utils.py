@@ -56,9 +56,7 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
         if nerger:
             # Nerger regularization
             hpbht = (hx**2).sum(axis=0)/normfact**2
-            hpbhtplusR = hpbht+oberrvar
-            Rlocalfact = (Rlocal*oberrvar/hpbhtplusR)/(1.-Rlocal*hpbht/hpbhtplusR)
-            Rinvsqrt = np.sqrt(Rlocalfact/oberrvar)
+            Rinvsqrt = np.sqrt(Rlocal/(hpbht*(1.-Rlocal)+oberrvar))
             YbRinv = hx*Rinvsqrt**2/normfact
             YbsqrtRinv = hx*Rinvsqrt/normfact
         else:
@@ -66,17 +64,16 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
             YbRinv = hx*(Rlocal/oberrvar)/normfact
         return YbsqrtRinv, YbRinv
 
-    def calcwts_mean(nens, hx, Rlocal, oberrvar, ominusf, nerger=True):
-        # nens is the original (unmodulated) ens size
+    def calcwts_mean(ndgf, hx, Rlocal, oberrvar, ominusf, nerger=True):
         nobs = hx.shape[1]
-        normfact = np.array(np.sqrt(nens-1),dtype=np.float64)
+        normfact = np.array(np.sqrt(ndgf),dtype=np.float64)
         # gain-form etkf solution
         # HZ^T = hxens * R**-1/2
         # compute eigenvectors/eigenvalues of A = HZ^T HZ (C=left SV)
         # (in Bishop paper HZ is nobs, nanals, here is it nanals, nobs)
         # normalize so dot product is covariance
         YbsqrtRinv, YbRinv = getYbvecs(hx,Rlocal,oberrvar,nerger=nerger)
-        if nobs >= nens:
+        if nobs >= hx.shape[0]:
             a = np.dot(YbsqrtRinv,YbsqrtRinv.T)
             evals, evecs, info = lapack.dsyevd(a)
             evals = evals.clip(min=np.finfo(evals.dtype).eps)
@@ -96,18 +93,17 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
         pa = np.dot(evecs/gammapI[np.newaxis,:],evecs.T)
         return np.dot(pa, np.dot(YbRinv,ominusf))/normfact
 
-    def calcwts_perts(nens, hx_orig, hx, Rlocal, oberrvar,nerger=True):
+    def calcwts_perts(ndgf, hx_orig, hx, Rlocal, oberrvar,nerger=True):
         # hx_orig contains the ensemble pert for the witheld member
-        # nens is the original (unmodulated) ens size
         nobs = hx.shape[1]
-        normfact = np.array(np.sqrt(nens-1),dtype=np.float64)
+        normfact = np.array(np.sqrt(ndgf),dtype=np.float64)
         # gain-form etkf solution
         # HZ^T = hxens * R**-1/2
         # compute eigenvectors/eigenvalues of A = HZ^T HZ (C=left SV)
         # (in Bishop paper HZ is nobs, nanals, here is it nanals, nobs)
         # normalize so dot product is covariance
         YbsqrtRinv, YbRinv = getYbvecs(hx,Rlocal,oberrvar,nerger=nerger)
-        if nobs >= nens:
+        if nobs >= hx.shape[0]:
             a = np.dot(YbsqrtRinv,YbsqrtRinv.T)
             evals, evecs, info = lapack.dsyevd(a)
             evals = evals.clip(min=np.finfo(evals.dtype).eps)
@@ -134,13 +130,13 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
             oberrvar_local = oberrs[mask]
             ominusf_local = (obs-hxmean)[mask]
             hxprime_local = hxprime[:,mask]
-            wts_ensmean = calcwts_mean(nanals, hxprime_local, Rlocal, oberrvar_local, ominusf_local, nerger=nerger)
+            wts_ensmean = calcwts_mean(nanals-1, hxprime_local, Rlocal, oberrvar_local, ominusf_local, nerger=nerger)
             xmean[n] += np.dot(wts_ensmean,xprime_b[:,n])
             # update sub-ensemble groups, using cross validation.
             for ngrp in range(ngroups):
                 nanal_cv = [na + ngrp*nanals_per_group for na in range(nanals_per_group)]
                 hxprime_cv = np.delete(hxprime_local,nanal_cv,axis=0); xprime_cv = np.delete(xprime_b[:,n],nanal_cv,axis=0)
-                wts_ensperts_cv = calcwts_perts(nanals-nanals//ngroups, hxprime_local[nanal_cv], hxprime_cv, Rlocal, oberrvar_local, nerger=nerger)
+                wts_ensperts_cv = calcwts_perts((nanals-nanals//ngroups)-1, hxprime_local[nanal_cv], hxprime_cv, Rlocal, oberrvar_local, nerger=nerger)
                 xprime[nanal_cv,n] += np.dot(wts_ensperts_cv,xprime_cv)
             xprime_mean = xprime[:,n].mean(axis=0) 
             xprime[:,n] -= xprime_mean # ensure zero mean
@@ -169,10 +165,10 @@ def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covloc
     else:
         nanals_per_group = nanals//ngroups
 
-    def getYbvecs(nlscales,hx,Rlocal,oberrvar):
+    def getYbvecs(ndgf,nlscales,hx,Rlocal,oberrvar):
         nanalstot, nobs = hx.shape
         nanals_orig = nanalstot//nlscales
-        normfact = np.array(np.sqrt(nanalstot-1),dtype=np.float64)
+        normfact = np.array(np.sqrt(ndgf),dtype=np.float64)
         YbsqrtRinv = np.empty((nanalstot,nobs),np.float64)
         YbRinv = np.empty((nanalstot,nobs),np.float64)
         hpbht = np.empty((nlscales,nobs),np.float64)
@@ -188,7 +184,10 @@ def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covloc
         hpbht_tot = hpbht.sum(axis=0)
         rij = rij/hpbht_tot
         for nl in range(nlscales):
-            Rinvsqrt_nerger[nl] = np.sqrt(Rlocal[nl]/(rij*hpbht_tot*(1.-Rlocal[nl])+oberrvar))
+            # CB's original version (no rij factor)
+            Rinvsqrt_nerger[nl] = np.sqrt(Rlocal[nl]/(hpbht_tot*(1.-Rlocal[nl])+oberrvar))
+            # CB's adjusted version
+            #Rinvsqrt_nerger[nl] = np.sqrt(Rlocal[nl]/(rij*(hpbht_tot*(1.-Rlocal[nl])+oberrvar)))
         Rdsqrt = (Rinvsqrt_nerger*hpbht).sum(axis=0)/hpbht_tot
         for nl in range(nlscales):
             nanal1=nl*nanals_orig; nanal2=(nl+1)*nanals_orig
@@ -196,16 +195,16 @@ def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covloc
             YbsqrtRinv[nanal1:nanal2] = hx[nanal1:nanal2]*Rinvsqrt_nerger[nl]/normfact
         return YbsqrtRinv, YbRinv
 
-    def calcwts_mean(nens, nlscales, hx, oberrvar, Rlocal, ominusf):
+    def calcwts_mean(ndgf, nlscales, hx, oberrvar, Rlocal, ominusf):
         nobs = hx.shape[1]
-        normfact = np.array(np.sqrt(nens-1),dtype=np.float64)
+        normfact = np.array(np.sqrt(ndgf),dtype=np.float64)
         # gain-form etkf solution
         # HZ^T = hxens * R**-1/2
         # compute eigenvectors/eigenvalues of A = HZ^T HZ (C=left SV)
         # (in Bishop paper HZ is nobs, nanals, here is it nanals, nobs)
         # normalize so dot product is covariance
-        YbsqrtRinv, YbRinv = getYbvecs(nlscales,hx,Rlocal,oberrvar)
-        if nobs >= nens:
+        YbsqrtRinv, YbRinv = getYbvecs(ndgf,nlscales,hx,Rlocal,oberrvar)
+        if nobs >= hx.shape[0]:
             a = np.dot(YbsqrtRinv,YbsqrtRinv.T)
             evals, evecs, info = lapack.dsyevd(a)
             evals = evals.clip(min=np.finfo(evals.dtype).eps)
@@ -226,16 +225,16 @@ def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covloc
         # wts_ensmean = C (Gamma + I)**-1 C^T (HZ)^ T R**-1/2 (y - HXmean)
         return np.dot(pa, np.dot(YbRinv,ominusf))/normfact
 
-    def calcwts_perts(nens, nlscales, hx_orig, hx, oberrvar, Rlocal):
+    def calcwts_perts(ndgf, nlscales, hx_orig, hx, oberrvar, Rlocal):
         nobs = hx.shape[1]
-        normfact = np.array(np.sqrt(nens-1),dtype=np.float64)
+        normfact = np.array(np.sqrt(ndgf),dtype=np.float64)
         # gain-form etkf solution
         # HZ^T = hxens * R**-1/2
         # compute eigenvectors/eigenvalues of A = HZ^T HZ (C=left SV)
         # (in Bishop paper HZ is nobs, nanals, here is it nanals, nobs)
         # normalize so dot product is covariance
-        YbsqrtRinv, YbRinv = getYbvecs(nlscales,hx,Rlocal,oberrvar)
-        if nobs >= nens:
+        YbsqrtRinv, YbRinv = getYbvecs(ndgf,nlscales,hx,Rlocal,oberrvar)
+        if nobs >= hx.shape[0]:
             a = np.dot(YbsqrtRinv,YbsqrtRinv.T)
             evals, evecs, info = lapack.dsyevd(a)
             evals = evals.clip(min=np.finfo(evals.dtype).eps)
@@ -265,7 +264,7 @@ def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covloc
             ominusf_local = omf[mask]
             hxprime_local = hxprime[:,mask]
             hxprime_orig_local = hxprime_orig[:,mask]
-            wts_ensmean = calcwts_mean(nanals, nlscales, hxprime_local, oberrvar_local, Rlocal, ominusf_local)
+            wts_ensmean = calcwts_mean(nanals-1, nlscales, hxprime_local, oberrvar_local, Rlocal, ominusf_local)
             xmean[n] += np.dot(wts_ensmean,xprime[:,n])
             # update one member at a time (one member for each scale), using cross validation.
             for ngrp in range(ngroups):
@@ -273,7 +272,7 @@ def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covloc
                 nanals_sub = np.nonzero(np.isin(nanal_index,nanal_cv))
                 hxprime_cv = np.delete(hxprime_local,nanals_sub,axis=0)
                 xprime_cv = np.delete(xprime[:,n],nanals_sub,axis=0)
-                wts_ensperts_cv = calcwts_perts(nanals-nanals//ngroups, nlscales, hxprime_orig_local[nanal_cv], hxprime_cv, oberrvar_local, Rlocal)
+                wts_ensperts_cv = calcwts_perts((nanals-nanals//ngroups)-1, nlscales, hxprime_orig_local[nanal_cv], hxprime_cv, oberrvar_local, Rlocal)
                 xprime_orig[nanal_cv,n] += np.dot(wts_ensperts_cv,xprime_cv)
             xprime_mean = xprime_orig[:,n].mean(axis=0) 
             xprime_orig[:,n] -= xprime_mean # ensure zero mean
