@@ -43,7 +43,6 @@ nassim = 1320  # assimilation times to run
 nassim_spinup = 120
 
 nanals = 8 # ensemble members
-nerger = True # use Nerger regularization for R localization
 ngroups = nanals  # number of groups for cross-validation (ngroups=nanals//n is "leave n out")
 
 oberrstdev = 1. # ob error standard deviation in K
@@ -218,8 +217,6 @@ for ntime in range(nassim):
                 for nanal in range(nanals):
                     zfilt[nanal], _ = models[nanal].z2xy(zprime[nanal])
             else:
-                #filtfact = np.exp(-(wavenums[np.newaxis,...]/cutoff)**8)
-                #zfiltspec = filtfact*zspec
                 zfiltspec = np.where(wavenums[np.newaxis,...] < cutoff, zspec, 0.+0.j)
                 zfilt = np.fft.irfft(zfiltspec)
             zens_filtered_lst.append(zfilt-zfilt_save)
