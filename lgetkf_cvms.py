@@ -42,7 +42,7 @@ exptname = os.getenv('exptname','test')
 nassim = 1320  # assimilation times to run
 nassim_spinup = 120
 
-nanals = 10 # ensemble members
+nanals = 8 # ensemble members
 nerger = True # use Nerger regularization for R localization
 ngroups = nanals  # number of groups for cross-validation (ngroups=nanals//n is "leave n out")
 

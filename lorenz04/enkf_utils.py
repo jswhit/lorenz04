@@ -3,13 +3,11 @@ from scipy.linalg import lapack, inv
 
 # function definitions.
 
-
 def cartdist(x1, x2, xmax):
     """cartesian distance on 1d periodic line"""
     dx = np.abs(x1 - x2)
     dx = np.where(dx > 0.5 * xmax, xmax - dx, dx)
     return np.sqrt(dx ** 2)
-
 
 def gaspcohn(r):
     """
@@ -35,7 +33,7 @@ def gaspcohn(r):
 
 def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
 
-    """returns ensemble updated by LGETKF with cross-validation"""
+    """returns ensemble updated by LGETKF with cross-validation and single-scale R localization"""
 
     hxmean = hxens.mean(axis=0)
     hxprime = hxens - hxmean
