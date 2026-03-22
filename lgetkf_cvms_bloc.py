@@ -322,4 +322,7 @@ if ncount:
     plt.loglog(wavenums,zspec_errmean,color='r')
     plt.loglog(wavenums,zspec_sprdmean,color='b')
     plt.title('error (red) and spread (blue) l=%s' % hcovlocal_scale)
-    plt.savefig('errorspread_spectra_cv_local%s.png' % hcovlocal_scale)
+    if nlscales == 2:
+        plt.savefig('errorspread_spectra_cv_local1%s_local2%s.png' % (hcovlocal_scales[0],hcovlocal_scales[1]))
+    else:
+        plt.savefig('errorspread_spectra_cv_local1%s.png' % hcovlocal_scales[0])
