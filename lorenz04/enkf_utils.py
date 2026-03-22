@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.linalg import lapack, inv
+from scipy.linalg import lapack, inv, eigh
 
 # function definitions.
 
@@ -30,6 +30,29 @@ def gaspcohn(r):
         taper,
     )
     return taper
+
+# ensemble modulator
+def modens(enspert, sqrtcovlocal):
+    neig = sqrtcovlocal.shape[0]
+    nanals = enspert.shape[0]
+    enspert2 = np.empty((neig*nanals,)+enspert.shape[1:],enspert.dtype)
+    nanal2 = 0
+    for j in range(neig):
+        for nanal in range(nanals):
+            enspert2[nanal2,...] =\
+            enspert[nanal,...]*sqrtcovlocal[j,np.newaxis,...]
+#           enspert[nanal,...]*sqrtcovlocal[neig-j-1,np.newaxis,...]
+            nanal2 += 1
+    return enspert2
+
+def get_nanal_index(nanals, neig):
+    nanal_index=np.empty(neig*nanals, np.int32)
+    nanal2 = 0
+    for j in range(neig):
+        for nanal in range(nanals):
+            nanal_index[nanal2]=nanal
+            nanal2 += 1
+    return nanal_index
 
 def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
 
@@ -277,3 +300,224 @@ def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covloc
             xens[:,n] = xmean[n]+xprime_orig[:,n]
 
     return xens
+
+def getkf_bloc(xens, ominusf, oberrvar, sqrtcovlocal, indxob, ngroups=None):
+
+    """returns ensemble updated by GETKF with cross-validation and model-space localization"""
+
+    nanals = xens.shape[0]
+    ndim = xens.shape[-1]
+    xmean = xens.mean(axis=0)
+    xprime = xens - xmean
+    xprime_b = xprime.copy()
+    if ngroups is None: # default is "leave one out" (nanals must be multiple of ngroups)
+        ngroups = nanals
+    if nanals % ngroups:
+        raise ValueError('nanals must be a multiple of ngroups')
+    else:
+        nanals_per_group = nanals//ngroups
+
+    def getYbvecs(ndgf, hx, oberrvar):
+        normfact = np.array(np.sqrt(ndgf),dtype=np.float32)
+        nens = hx.shape[0]
+        YbsqrtRinv = (hx/normfact)*np.sqrt(1./oberrvar)
+        YbRinv = (hx/normfact)*(1./oberrvar)
+        return YbsqrtRinv, YbRinv
+
+    def calcwts_mean(ndgf, hx, oberrvar, ominusf):
+        # nens is the original (unmodulated) ens size
+        nobs = hx.shape[1]
+        normfact = np.array(np.sqrt(ndgf),dtype=np.float32)
+        # gain-form etkf solution
+        # HZ^T = hxens * R**-1/2
+        # compute eigenvectors/eigenvalues of A = HZ^T HZ (C=left SV)
+        # (in Bishop paper HZ is nobs, nanals, here is it nanals, nobs)
+        # normalize so dot product is covariance
+        YbsqrtRinv, YbRinv = getYbvecs(ndgf, hx,oberrvar)
+        if nobs >= hx.shape[0]:
+            a = np.dot(YbsqrtRinv,YbsqrtRinv.T)
+            evals, evecs = eigh(a,driver='evd')
+            evals = evals.clip(min=np.finfo(evals.dtype).eps)
+        else:
+            a = np.dot(YbsqrtRinv.T,YbsqrtRinv)
+            evals, evecs = eigh(a,driver='evd')
+            evals = evals.clip(min=np.finfo(evals.dtype).eps)
+            evecs = np.dot(YbsqrtRinv,evecs/np.sqrt(evals))
+        # gammapI used in calculation of posterior cov in ensemble space
+        gammapI = evals+1.
+        # compute factor to multiply with model space ensemble perturbations
+        # to compute analysis increment (for mean update).
+        # This is the factor C (Gamma + I)**-1 C^T (HZ)^ T R**-1/2 (y - HXmean)
+        # in Bishop paper (eqs 10-12).
+        # pa = C (Gamma + I)**-1 C^T (analysis error cov in ensemble space)
+        # wts_ensmean = C (Gamma + I)**-1 C^T (HZ)^ T R**-1/2 (y - HXmean)
+        pa = np.dot(evecs/gammapI[np.newaxis,:],evecs.T)
+        return np.dot(pa, np.dot(YbRinv,ominusf))/normfact
+
+    def calcwts_perts(ndgf, hx_orig, hx, oberrvar):
+        # hx_orig contains the ensemble for the witheld member
+        nobs = hx.shape[1]
+        normfact = np.array(np.sqrt(ndgf),dtype=np.float32)
+        # gain-form etkf solution
+        # HZ^T = hxens * R**-1/2
+        # compute eigenvectors/eigenvalues of A = HZ^T HZ (C=left SV)
+        # (in Bishop paper HZ is nobs, nanals, here is it nanals, nobs)
+        # normalize so dot product is covariance
+        YbsqrtRinv, YbRinv = getYbvecs(ndgf,hx,oberrvar)
+        if nobs >= ndgf:
+            a = np.dot(YbsqrtRinv,YbsqrtRinv.T)
+            evals, evecs = eigh(a,driver='evd')
+            evals = evals.clip(min=np.finfo(evals.dtype).eps)
+        else:
+            a = np.dot(YbsqrtRinv.T,YbsqrtRinv)
+            evals, evecs = eigh(a,driver='evd')
+            evals = evals.clip(min=np.finfo(evals.dtype).eps)
+            evecs = np.dot(YbsqrtRinv,evecs/np.sqrt(evals))
+        # gammapI used in calculation of posterior cov in ensemble space
+        gamma_inv = 1./evals; gammapI = evals+1.
+        # compute factor to multiply with model space ensemble perturbations
+        # to compute analysis increment (for perturbation update), save in single precision.
+        # This is -C [ (I - (Gamma+I)**-1/2)*Gamma**-1 ] C^T (HZ)^T R**-1/2 HXprime
+        # in Bishop paper (eqn 29).
+        # wts_ensperts = -C [ (I - (Gamma+I)**-1/2)*Gamma**-1 ] C^T (HZ)^T R**-1/2 HXprime
+        pasqrt=np.dot(evecs*(1.-np.sqrt(1./gammapI[np.newaxis,:]))*gamma_inv[np.newaxis,:],evecs.T)
+        return -np.dot(pasqrt, np.dot(YbRinv,hx_orig.T)).T/normfact # use witheld ens member here
+
+    xprime2 = modens(xprime_b,sqrtcovlocal)
+    nanals2 = xprime2.shape[0]
+    nanal_index = get_nanal_index(nanals, nanals2//nanals)
+    nobs = len(indxob)
+    hxprime = np.empty((nanals,nobs),np.float32)
+    hxprime2 = np.empty((nanals2,nobs),np.float32)
+    for nanal in range(nanals):
+        hxprime[nanal] = xprime[nanal,indxob]
+    for nanal in range(nanals2):
+        hxprime2[nanal] = xprime2[nanal,indxob]
+    wts_ensmean = calcwts_mean(nanals-1, hxprime2, oberrvar, ominusf)
+    xmean += np.dot(wts_ensmean,xprime2)
+    # update sub-ensemble groups, using cross validation.
+    for ngrp in range(ngroups):
+        nanal_cv = [na + ngrp*nanals_per_group for na in range(nanals_per_group)]
+        nanals_sub = np.nonzero(np.isin(nanal_index,nanal_cv))
+        hxprime_cv = np.delete(hxprime2,nanals_sub,axis=0)
+        xprime_cv = np.delete(xprime2,nanals_sub,axis=0)
+        wts_ensperts_cv = calcwts_perts((nanals-nanals//ngroups)-1, hxprime[nanal_cv], hxprime_cv, oberrvar)
+        xprime[nanal_cv] += np.dot(wts_ensperts_cv,xprime_cv)
+        xprime_mean = xprime.mean(axis=0) 
+        xprime -= xprime_mean # ensure zero mean
+    return xmean+xprime
+
+def getkfms_bloc(xens, xprime, ominusf, oberrvar, sqrtcovlocal, indxob, ngroups=None):
+
+    """returns ensemble updated by GETKF with cross-validation and multi-scale model-space localization"""
+
+    # xens is original ensemble, xprime has scale-decomposed ensemble perturbations
+    nanals = xprime.shape[0]
+    nlscales = xprime.shape[1]
+    nx = xprime.shape[-1]
+    xmean = xens.mean(axis=0)
+    xprime_orig = xens - xmean
+    if ngroups is None: # default is "leave one out" (nanals must be multiple of ngroups)
+        ngroups = nanals
+    if nanals % ngroups:
+        raise ValueError('nanals must be a multiple of ngroups')
+    else:
+        nanals_per_group = nanals//ngroups
+
+    def getYbvecs(ndgf, hx, oberrvar):
+        normfact = np.array(np.sqrt(ndgf),dtype=np.float32)
+        nens = hx.shape[0]
+        YbsqrtRinv = (hx/normfact)*np.sqrt(1./oberrvar)
+        YbRinv = (hx/normfact)*(1./oberrvar)
+        return YbsqrtRinv, YbRinv
+
+    def calcwts_mean(ndgf, hx, oberrvar, ominusf):
+        # nens is the original (unmodulated) ens size
+        nobs = hx.shape[1]
+        normfact = np.array(np.sqrt(ndgf),dtype=np.float32)
+        # gain-form etkf solution
+        # HZ^T = hxens * R**-1/2
+        # compute eigenvectors/eigenvalues of A = HZ^T HZ (C=left SV)
+        # (in Bishop paper HZ is nobs, nanals, here is it nanals, nobs)
+        # normalize so dot product is covariance
+        YbsqrtRinv, YbRinv = getYbvecs(ndgf,hx,oberrvar)
+        if nobs >= hx.shape[0]:
+            a = np.dot(YbsqrtRinv,YbsqrtRinv.T)
+            evals, evecs = eigh(a,driver='evd')
+            #evals, evecs, info = lapack.dsyevd(a)
+            evals = evals.clip(min=np.finfo(evals.dtype).eps)
+        else:
+            a = np.dot(YbsqrtRinv.T,YbsqrtRinv)
+            evals, evecs = eigh(a,driver='evd')
+            #evals, evecs, info = lapack.dsyevd(a)
+            evals = evals.clip(min=np.finfo(evals.dtype).eps)
+            evecs = np.dot(YbsqrtRinv,evecs/np.sqrt(evals))
+        # gammapI used in calculation of posterior cov in ensemble space
+        gammapI = evals+1.
+        # compute factor to multiply with model space ensemble perturbations
+        # to compute analysis increment (for mean update).
+        # This is the factor C (Gamma + I)**-1 C^T (HZ)^ T R**-1/2 (y - HXmean)
+        # in Bishop paper (eqs 10-12).
+        # pa = C (Gamma + I)**-1 C^T (analysis error cov in ensemble space)
+        # wts_ensmean = C (Gamma + I)**-1 C^T (HZ)^ T R**-1/2 (y - HXmean)
+        pa = np.dot(evecs/gammapI[np.newaxis,:],evecs.T)
+        return np.dot(pa, np.dot(YbRinv,ominusf))/normfact
+
+    def calcwts_perts(ndgf, hx_orig, hx, oberrvar):
+        # hx_orig contains the ensemble for the witheld member
+        # nens is the original (unmodulated) ens size
+        nobs = hx.shape[1]
+        normfact = np.array(np.sqrt(ndgf),dtype=np.float32)
+        # gain-form etkf solution
+        # HZ^T = hxens * R**-1/2
+        # compute eigenvectors/eigenvalues of A = HZ^T HZ (C=left SV)
+        # (in Bishop paper HZ is nobs, nanals, here is it nanals, nobs)
+        # normalize so dot product is covariance
+        YbsqrtRinv, YbRinv = getYbvecs(ndgf,hx,oberrvar)
+        if nobs >= hx.shape[0]:
+            a = np.dot(YbsqrtRinv,YbsqrtRinv.T)
+            evals, evecs = eigh(a,driver='evd')
+            #evals, evecs, info = lapack.dsyevd(a)
+            evals = evals.clip(min=np.finfo(evals.dtype).eps)
+        else:
+            a = np.dot(YbsqrtRinv.T,YbsqrtRinv)
+            evals, evecs = eigh(a,driver='evd')
+            #evals, evecs, info = lapack.dsyevd(a)
+            evals = evals.clip(min=np.finfo(evals.dtype).eps)
+            evecs = np.dot(YbsqrtRinv,evecs/np.sqrt(evals))
+        # gammapI used in calculation of posterior cov in ensemble space
+        gamma_inv = 1./evals; gammapI = evals+1.
+        # compute factor to multiply with model space ensemble perturbations
+        # to compute analysis increment (for perturbation update), save in single precision.
+        # This is -C [ (I - (Gamma+I)**-1/2)*Gamma**-1 ] C^T (HZ)^T R**-1/2 HXprime
+        # in Bishop paper (eqn 29).
+        # wts_ensperts = -C [ (I - (Gamma+I)**-1/2)*Gamma**-1 ] C^T (HZ)^T R**-1/2 HXprime
+        pasqrt=np.dot(evecs*(1.-np.sqrt(1./gammapI[np.newaxis,:]))*gamma_inv[np.newaxis,:],evecs.T)
+        return -np.dot(pasqrt, np.dot(YbRinv,hx_orig.T)).T/normfact # use witheld ens member here
+
+    neig = sqrtcovlocal.shape[0]
+    nanals2 = nanals*neig
+    xprime2 = (modens(xprime.reshape((nanals,nlscales*nx)),sqrtcovlocal)).reshape((nanals2,nlscales,nx))
+    xprime2 = xprime2.sum(axis=1) # sum over wavebands after modulation
+    xprime = xprime.sum(axis=1) # sum over wavebands
+    nanal_index = get_nanal_index(nanals, neig)
+    nobs = len(indxob)
+    hxprime = np.empty((nanals,nobs),np.float32)
+    hxprime2 = np.empty((nanals2,nobs),np.float32)
+    for nanal in range(nanals):
+        hxprime[nanal] = xprime[nanal,indxob]
+    for nanal in range(nanals2):
+        hxprime2[nanal] = xprime2[nanal,indxob]
+    wts_ensmean = calcwts_mean(nanals-1, hxprime2, oberrvar, ominusf)
+    xmean += np.dot(wts_ensmean,xprime2)
+    # update sub-ensemble groups, using cross validation.
+    for ngrp in range(ngroups):
+        nanal_cv = [na + ngrp*nanals_per_group for na in range(nanals_per_group)]
+        nanals_sub = np.nonzero(np.isin(nanal_index,nanal_cv))
+        hxprime_cv = np.delete(hxprime2,nanals_sub,axis=0)
+        xprime_cv = np.delete(xprime2,nanals_sub,axis=0)
+        wts_ensperts_cv = calcwts_perts((nanals-nanals//ngroups)-1, hxprime[nanal_cv], hxprime_cv, oberrvar)
+        xprime_orig[nanal_cv] += np.dot(wts_ensperts_cv,xprime_cv)
+    xprime_mean = xprime_orig.mean(axis=0) 
+    xprime_orig -= xprime_mean # ensure zero mean
+    return xmean+xprime_orig
