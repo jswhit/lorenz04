@@ -10,6 +10,55 @@ import numpy as np
 # where b-> space_time_scale, c-> coupling, F-> forcing, I-> smooth_steps
 
 class Lorenz04:
+
+# The model equations are given by
+# 
+# Model 3 (III)
+#      dZ_i
+#      ---- = [X,X]_{K,i} + b^2 (-Y_{i-2}Y_{i-1} + Y_{i-1}Y_{i+1})
+#       dt                +  c  (-Y_{i-2}X_{i-1} + Y_{i-1}X_{i+1})
+#                         -  X_i - b Y_i + F,
+#
+# where
+#
+#     [X,X]_{K,i} = -W_{i-2K}W_{i-K} 
+#                 +  sumprime_{j=-(K/2)}^{K/2} W_{i-K+j}X_{i+K+j}/K,
+#
+#      W_i =  sumprime_{j=-(K/2)}^{K/2} X_{i-j}/K,
+#
+# and sumprime denotes a special kind of summation where the first
+# and last terms are divided by 2.
+#
+# NOTE: The equations above are only valid for K even.  If K is odd,
+# then sumprime is replaced by the traditional sum, and the K/2 limits
+# of summation are replaced by (K-1)/2. THIS CODE ONLY IMPLEMENTS THE
+# K EVEN SOLUTION!!!
+#
+# The variable that is integrated is Z,
+# but the integration of Z requires
+# the variables X and Y.  For model III they are obtained by
+#
+#      X_i = sumprime_{j= -J}^{J} a_j Z_{i+j}
+#      Y_i = Z_i - X_i.
+#
+# The "a" coefficients are given by
+#
+#      a_j = alpha - beta |j|,
+# 
+# where
+#
+#      alpha = (3J^2 + 3)/(2J^3 + 4J)
+#      beta  = (2J^2 + 1)/(1J^4 + 2J^2).
+#
+# This choice of alpha and beta ensures that X_i will equal Z_i
+# when Z_i varies quadratically over the interval 2J.   This choice
+# of alpha and beta means that sumprime a_j = 1 and 
+# sumprime (j^2) a_j = 0.
+#
+# Note that the impact of this filtering is to put large-scale
+# variations into the X variable, and small-scale variations into
+# the Y variable.
+
     def __init__(
         self,
         z = None,
