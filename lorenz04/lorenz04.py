@@ -1,6 +1,8 @@
 import numpy as np
 
-# parameters from Harty et al (https://doi.org/10.1080/16000870.2021.1903692)
+# model III from Lorenz 2005 (https://doi.org/10.1175/JAS3430.1)
+# used by Harty et al 2021 (https://doi.org/10.1080/16000870.2021.1903692)
+# translated from Fortran code in DART
 
 # Parameter	Nz	K	I	F	b	c
 # Harty et al	960	32	12	14	1	0.37
