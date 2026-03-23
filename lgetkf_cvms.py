@@ -163,7 +163,7 @@ for ntime in range(nassim):
     t1 = time.time()
     if fixednetwork:
         nskip = nx//nobs
-        indxob = np.arange(nx)[::nskip]
+        indxob = np.arange(nx)[ntime%nskip::nskip]
     else:
         indxob = np.sort(rsobs.choice(nx,nobs,replace=False))
     zob = z_truth[ntime+ntstart,indxob]

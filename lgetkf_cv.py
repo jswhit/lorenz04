@@ -63,7 +63,7 @@ for nanal in range(nanals):
 print("# hcovlocal=%g nanals=%s ngroups=%s" %\
         (hcovlocal_scale,nanals,ngroups))
 
-# if fixednetwork=True, every nx//nobs grid point is observed.
+# if fixednetwork=True, every nx//nobs grid point is observed (network moves 1 point every assim step).
 # otherwise, each ob time nobs ob locations are randomly sampled (without
 # replacement) from the model grid
 fixednetwork = False
@@ -146,7 +146,7 @@ for ntime in range(nassim):
     t1 = time.time()
     if fixednetwork:
         nskip = nx//nobs
-        indxob = np.arange(nx)[::nskip]
+        indxob = np.arange(nx)[ntime%nskip::nskip]
     else:
         indxob = np.sort(rsobs.choice(nx,nobs,replace=False))
     zob = z_truth[ntime+ntstart,indxob]

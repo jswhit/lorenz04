@@ -4,7 +4,7 @@ import numpy as np
 
 # Parameter	Nz	K	I	F	b	c
 # Harty et al	960	32	12	14	1	0.37
-# Lorenz 	960	32	12	15	1	2.5
+# Lorenz 	960	32	12	15	10	2.5
 # where b-> space_time_scale, c-> coupling, F-> forcing, I-> smooth_steps
 
 class Lorenz04:
@@ -15,7 +15,7 @@ class Lorenz04:
         forcing: float = 14.00,
         dt: float = 0.05/24,
         space_time_scale: float = 1.00,
-        coupling: float = 0.37,
+        coupling: float = 0.4,
         K: int = 32,
         smooth_steps: int = 12
     ):
@@ -155,6 +155,7 @@ class Lorenz04:
 # Example usage
 # ------------------------------------------------------------------
 if __name__ == "__main__":
+    #model = Lorenz04(space_time_scale=10,forcing=15,coupling=2.5) # original settings from Lorenz paper
     model = Lorenz04()
 
     # random initial condition
