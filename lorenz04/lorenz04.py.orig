@@ -8,7 +8,7 @@ class Lorenz04:
         forcing: float = 14.00,
         dt: float = 0.05/24,
         space_time_scale: float = 1.00,
-        coupling: float = 0.37,
+        coupling: float = 0.4,
         K: int = 32,
         smooth_steps: int = 12
     ):
