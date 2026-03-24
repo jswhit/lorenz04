@@ -3,7 +3,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from netCDF4 import Dataset
-import sys, time
+import sys, time, os
 from lorenz04 import Lorenz04, cartdist, getkf_bloc, gaspcohn
 from scipy.linalg import eigh
 
@@ -25,10 +25,11 @@ savedata = None
 nassim = 1320  # assimilation times to run
 nassim_spinup = 120
 
-nanals = 8 # ensemble members
+nanals = 5 # ensemble members
 ngroups = nanals  # number of groups for cross-validation (ngroups=nanals//n is "leave n out")
 
 oberrstdev = 1. # ob error standard deviation in K
+exptname = os.getenv('exptname','test')
 
 # nature run created using lorenz04_run.py.
 filename_climo = 'lorenz04_truth.nc' # file name for forecast model climo
@@ -251,5 +252,5 @@ if ncount:
         print('# ',wavenums[n],zspec_errmean[n],zspec_sprdmean[n])
     plt.loglog(wavenums,zspec_errmean,color='r')
     plt.loglog(wavenums,zspec_sprdmean,color='b')
-    plt.title('error (red) and spread (blue) l=%s' % hcovlocal_scale)
-    plt.savefig('errorspread_spectra_cv_local%s.png' % hcovlocal_scale)
+    plt.title('error (red) and spread (blue) %s' % exptname)
+    plt.savefig('errorspread_spectra_cv_%s.png' % exptname)

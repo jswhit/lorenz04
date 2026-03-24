@@ -3,7 +3,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from netCDF4 import Dataset
-import sys, time
+import sys, time, os
 from lorenz04 import Lorenz04, cartdist, getkfms_bloc, gaspcohn
 from scipy.linalg import eigh
 
@@ -30,8 +30,9 @@ if len(crossbandcov_facts) != nband_cutoffs:
 profile = False # turn on profiling?
 
 # if savedata not None, netcdf data will be saved with filename 'savedata'
+exptname = os.getenv('exptname','test')
 savedata = None
-#savedata = 'lgetkfcv_local%s.nc' % hcovlocal_scale
+#savedata = 'lgetkfcv_%s.nc' % exptname
 nassim = 1320  # assimilation times to run
 nassim_spinup = 120
 
@@ -321,8 +322,5 @@ if ncount:
         print('# ',wavenums[n],zspec_errmean[n],zspec_sprdmean[n])
     plt.loglog(wavenums,zspec_errmean,color='r')
     plt.loglog(wavenums,zspec_sprdmean,color='b')
-    plt.title('error (red) and spread (blue) l=%s' % hcovlocal_scale)
-    if nlscales == 2:
-        plt.savefig('errorspread_spectra_cv_local1%s_local2%s.png' % (hcovlocal_scales[0],hcovlocal_scales[1]))
-    else:
-        plt.savefig('errorspread_spectra_cv_local1%s.png' % hcovlocal_scales[0])
+    plt.title('error (red) and spread (blue) %s' % exptname)
+    plt.savefig('errorspread_spectra_cvms_%s.png' % exptname)
