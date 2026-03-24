@@ -40,7 +40,7 @@ exptname = os.getenv('exptname','test')
 nassim = 1320  # assimilation times to run
 nassim_spinup = 120
 
-nanals = 8 # ensemble members
+nanals = 5 # ensemble members
 ngroups = nanals  # number of groups for cross-validation (ngroups=nanals//n is "leave n out")
 
 oberrstdev = 1. # ob error standard deviation in K
