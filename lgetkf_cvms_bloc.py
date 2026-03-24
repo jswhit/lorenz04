@@ -35,7 +35,7 @@ savedata = None
 nassim = 1320  # assimilation times to run
 nassim_spinup = 120
 
-nanals = 8 # ensemble members
+nanals = 5 # ensemble members
 ngroups = nanals  # number of groups for cross-validation (ngroups=nanals//n is "leave n out")
 
 oberrstdev = 1. # ob error standard deviation in K
@@ -114,7 +114,7 @@ if nlscales == 2:
     evals, evecs = eigh(covlocal,driver='evd')
     evals = evals.clip(min=np.finfo(evals.dtype).eps)
     neig = 1
-    for i in range(1,nx):
+    for i in range(1,nlscales*nx):
         percentvar = evals[-i:].sum()/evals.sum()
         if percentvar > percentvar_cutoff: # perc variance cutoff truncation
             neig = i
@@ -122,7 +122,7 @@ if nlscales == 2:
     evecs_norm = np.dot(evecs, np.diag(np.sqrt(evals/percentvar))).T
     sqrtcovlocal_model = evecs_norm[-neig:,:].astype(np.float32)
 elif nlscales == 1:
-    for i in range(1,npts):
+    for i in range(1,nx):
         percentvar = evals[-i:].sum()/evals.sum()
         if percentvar > percentvar_cutoff: # perc variance cutoff truncation
             neig = i
