@@ -521,3 +521,137 @@ def getkfms_bloc(xens, xprime, ominusf, oberrvar, sqrtcovlocal, indxob, ngroups=
     xprime_mean = xprime_orig.mean(axis=0) 
     xprime_orig -= xprime_mean # ensure zero mean
     return xmean+xprime_orig
+
+def lgetkfms_bloc(xens, xprime, omf, oberrs, sqrtcovlocal_local, covlocal_ob, indxob, covlocal_model, ngroups=None):
+
+    """returns ensemble updated by LGETKF with cross-validation and multi-scale model-space localization"""
+
+    # xens is original ensemble, xprime has scale-decomposed ensemble perturbations
+    nanals = xprime.shape[0]
+    nlscales = xprime.shape[1]
+    ndim = xprime.shape[-1]
+    xmean = xens.mean(axis=0)
+    xprime_orig = xens - xmean
+    if ngroups is None: # default is "leave one out" (nanals must be multiple of ngroups)
+        ngroups = nanals
+    if nanals % ngroups:
+        raise ValueError('nanals must be a multiple of ngroups')
+    else:
+        nanals_per_group = nanals//ngroups
+
+    def getYbvecs(ndgf, hx, oberrvar):
+        normfact = np.array(np.sqrt(ndgf),dtype=np.float32)
+        nens = hx.shape[0]
+        YbsqrtRinv = (hx/normfact)*np.sqrt(1./oberrvar)
+        YbRinv = (hx/normfact)*(1./oberrvar)
+        return YbsqrtRinv, YbRinv
+
+    def calcwts_mean(ndgf, hx, oberrvar, ominusf):
+        # nens is the original (unmodulated) ens size
+        nobs = hx.shape[1]
+        normfact = np.array(np.sqrt(ndgf),dtype=np.float32)
+        # gain-form etkf solution
+        # HZ^T = hxens * R**-1/2
+        # compute eigenvectors/eigenvalues of A = HZ^T HZ (C=left SV)
+        # (in Bishop paper HZ is nobs, nanals, here is it nanals, nobs)
+        # normalize so dot product is covariance
+        YbsqrtRinv, YbRinv = getYbvecs(ndgf,hx,oberrvar)
+        if nobs >= hx.shape[0]:
+            a = np.dot(YbsqrtRinv,YbsqrtRinv.T)
+            evals, evecs = eigh(a,driver=lapack_driver)
+            #evals, evecs, info = lapack.dsyevd(a)
+            evals = evals.clip(min=np.finfo(evals.dtype).eps)
+        else:
+            a = np.dot(YbsqrtRinv.T,YbsqrtRinv)
+            evals, evecs = eigh(a,driver=lapack_driver)
+            #evals, evecs, info = lapack.dsyevd(a)
+            evals = evals.clip(min=np.finfo(evals.dtype).eps)
+            evecs = np.dot(YbsqrtRinv,evecs/np.sqrt(evals))
+        # gammapI used in calculation of posterior cov in ensemble space
+        gammapI = evals+1.
+        # compute factor to multiply with model space ensemble perturbations
+        # to compute analysis increment (for mean update).
+        # This is the factor C (Gamma + I)**-1 C^T (HZ)^ T R**-1/2 (y - HXmean)
+        # in Bishop paper (eqs 10-12).
+        # pa = C (Gamma + I)**-1 C^T (analysis error cov in ensemble space)
+        # wts_ensmean = C (Gamma + I)**-1 C^T (HZ)^ T R**-1/2 (y - HXmean)
+        pa = np.dot(evecs/gammapI[np.newaxis,:],evecs.T)
+        return np.dot(pa, np.dot(YbRinv,ominusf))/normfact
+
+    def calcwts_perts(ndgf, hx_orig, hx, oberrvar):
+        # hx_orig contains the ensemble for the witheld member
+        # nens is the original (unmodulated) ens size
+        nobs = hx.shape[1]
+        normfact = np.array(np.sqrt(ndgf),dtype=np.float32)
+        # gain-form etkf solution
+        # HZ^T = hxens * R**-1/2
+        # compute eigenvectors/eigenvalues of A = HZ^T HZ (C=left SV)
+        # (in Bishop paper HZ is nobs, nanals, here is it nanals, nobs)
+        # normalize so dot product is covariance
+        YbsqrtRinv, YbRinv = getYbvecs(ndgf,hx,oberrvar)
+        if nobs >= hx.shape[0]:
+            a = np.dot(YbsqrtRinv,YbsqrtRinv.T)
+            evals, evecs = eigh(a,driver=lapack_driver)
+            #evals, evecs, info = lapack.dsyevd(a)
+            evals = evals.clip(min=np.finfo(evals.dtype).eps)
+        else:
+            a = np.dot(YbsqrtRinv.T,YbsqrtRinv)
+            evals, evecs = eigh(a,driver=lapack_driver)
+            #evals, evecs, info = lapack.dsyevd(a)
+            evals = evals.clip(min=np.finfo(evals.dtype).eps)
+            evecs = np.dot(YbsqrtRinv,evecs/np.sqrt(evals))
+        # gammapI used in calculation of posterior cov in ensemble space
+        gamma_inv = 1./evals; gammapI = evals+1.
+        # compute factor to multiply with model space ensemble perturbations
+        # to compute analysis increment (for perturbation update), save in single precision.
+        # This is -C [ (I - (Gamma+I)**-1/2)*Gamma**-1 ] C^T (HZ)^T R**-1/2 HXprime
+        # in Bishop paper (eqn 29).
+        # wts_ensperts = -C [ (I - (Gamma+I)**-1/2)*Gamma**-1 ] C^T (HZ)^T R**-1/2 HXprime
+        pasqrt=np.dot(evecs*(1.-np.sqrt(1./gammapI[np.newaxis,:]))*gamma_inv[np.newaxis,:],evecs.T)
+        return -np.dot(pasqrt, np.dot(YbRinv,hx_orig.T)).T/normfact # use witheld ens member here
+
+    nc = 0
+    for n in range(ndim):
+        mask = covlocal_ob[:,n] > np.finfo(covlocal_ob.dtype).eps
+        mask_local = covlocal_model[:,n] > np.finfo(covlocal_model.dtype).eps
+        # indices of model grid points in local volume on global grid
+        indx_local = np.nonzero(mask_local)[0]
+        # global indices of observations in local volume
+        indxob_local = np.nonzero(mask)[0]
+        # indices of observation grid points in local volume on local grid
+        indxob_local_local = np.isin(indx_local,indxob[indxob_local])
+        nobs_local = len(indxob_local); npts_local = len(indx_local)
+        if nobs_local != indxob_local_local.sum():
+            raise ValueError('not all obs in local volume accounted for')
+        xprime_local = xprime[:,:,indx_local]
+        neig = sqrtcovlocal_local[nc].shape[0]
+        nanals2 = nanals*neig
+        xprime2_local = (modens(xprime_local.reshape((nanals,nlscales*npts_local)),sqrtcovlocal_local[nc])).reshape((nanals2,nlscales,npts_local))
+        xprime2_local = xprime2_local.sum(axis=1) # sum over wavebands after modulation
+        xprime_local = xprime_local.sum(axis=1) # sum over wavebands
+        nmindist = np.argmax(covlocal_model[indx_local,n])
+        nanal_index = get_nanal_index(nanals, neig)
+        if nobs_local > 0:
+            hxprime_local = np.empty((nanals,nobs_local),np.float32)
+            hxprime2_local = np.empty((nanals2,nobs_local),np.float32)
+            for nanal in range(nanals):
+                hxprime_local[nanal] = xprime_local[nanal,indxob_local_local]
+            for nanal in range(nanals2):
+                hxprime2_local[nanal] = xprime2_local[nanal,indxob_local_local]
+            oberrvar_local = oberrs[mask]
+            ominusf_local = omf[mask]
+            wts_ensmean = calcwts_mean(nanals-1, hxprime2_local, oberrvar_local, ominusf_local)
+            xmean[n] += np.dot(wts_ensmean,xprime2_local[:,nmindist])
+            # update sub-ensemble groups, using cross validation.
+            for ngrp in range(ngroups):
+                nanal_cv = [na + ngrp*nanals_per_group for na in range(nanals_per_group)]
+                nanals_sub = np.nonzero(np.isin(nanal_index,nanal_cv))
+                hxprime_cv = np.delete(hxprime2_local,nanals_sub,axis=0)
+                xprime_cv = np.delete(xprime2_local[:,nmindist],nanals_sub,axis=0)
+                wts_ensperts_cv = calcwts_perts((nanals-nanals//ngroups)-1, hxprime_local[nanal_cv], hxprime_cv, oberrvar_local)
+                xprime_orig[nanal_cv,n] += np.dot(wts_ensperts_cv,xprime_cv)
+            xprime_mean = xprime_orig[:,n].mean(axis=0) 
+            xprime_orig[:,n] -= xprime_mean # ensure zero mean
+        nc += 1
+
+    return xmean+xprime_orig
