@@ -264,7 +264,7 @@ for ntime in range(nassim):
         zprime[:,nlscale,:] = zens_filtered_lst[nlscale]
 
     # GETKF update with b localization.
-    zens = getkfms_bloc(zens, zprime, zob-hxensmean_b, oberrvar, sqrtcovlocal_model, indxob, ngroups=None)
+    zens = getkfms_bloc(zens, zprime, zob-hxensmean_b, oberrvar, sqrtcovlocal_model, indxob, ngroups=ngroups)
 
     t2 = time.time()
     if profile: print('cpu time for EnKF update',t2-t1)
