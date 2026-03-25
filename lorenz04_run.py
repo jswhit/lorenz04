@@ -2,7 +2,9 @@ from lorenz04 import Lorenz04
 import numpy as np
 from netCDF4 import Dataset
 
-model = Lorenz04()
+# model definition
+model = Lorenz04(K=32,forcing=14,space_time_scale=1,coupling=0.4,smooth_steps=12)
+
 # random initial condition
 model.z = np.full(model.model_size, model.forcing) + np.random.uniform(-1,1,size=model.model_size)
 
