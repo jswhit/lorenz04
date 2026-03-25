@@ -4,9 +4,9 @@ import numpy as np
 # used by Harty et al 2021 (https://doi.org/10.1080/16000870.2021.1903692)
 # translated from Fortran code in DART
 
-# Parameter	Nz	K	I	F	b	c
-# Harty et al	960	32	12	14	1	0.37
-# Lorenz 	960	32	12	15	10	2.5
+# Parameter     Nz      K       I       F       b       c
+# Harty et al   960     32      12      14      1       0.37
+# Lorenz        960     32      12      15      10      2.5
 # Here          960     32      12      14      1       0.4
 # where b-> space_time_scale, c-> coupling, F-> forcing, I-> smooth_steps
 
