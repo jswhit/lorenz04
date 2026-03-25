@@ -8,7 +8,6 @@ model = Lorenz04(K=32,forcing=14,space_time_scale=1,coupling=0.4,smooth_steps=12
 # random initial condition
 model.z = np.full(model.model_size, model.forcing) + np.random.uniform(-1,1,size=model.model_size)
 
-#  initialize figure.
 outputinterval = 24
 tmin = 25.
 tmax = 125.
