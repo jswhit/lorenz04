@@ -9,7 +9,7 @@ from scipy.linalg import eigh
 
 if len(sys.argv) == 1:
    msg="""
-python lgetkf_cv_bloc.py hcovlocal_scale
+python getkf_cv_bloc.py hcovlocal_scale
    hcovlocal_scale = horizontal localization scale
    """
    raise SystemExit(msg)
@@ -21,7 +21,7 @@ profile = False # turn on profiling?
 
 # if savedata not None, netcdf data will be saved with filename 'savedata'
 savedata = None
-#savedata = 'lgetkfcv_local%s.nc' % hcovlocal_scale
+#savedata = 'getkfcv_local%s.nc' % hcovlocal_scale
 nassim = 1320  # assimilation times to run
 nassim_spinup = 120
 

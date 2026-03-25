@@ -9,7 +9,7 @@ from scipy.linalg import eigh
 
 if len(sys.argv) == 1:
    msg="""
-python lgetkf_cvms_bloc.py hcovlocal_scales band_cutoffs crossbandcov_facts
+python getkf_cvms_bloc.py hcovlocal_scales band_cutoffs crossbandcov_facts
    hcovlocal_scales = horizontal localization scale(s)
    band_cutoffs = filter waveband cutoffs 
    crossbandcov_facts = cross-band covariance factors
@@ -32,7 +32,7 @@ profile = False # turn on profiling?
 # if savedata not None, netcdf data will be saved with filename 'savedata'
 exptname = os.getenv('exptname','test')
 savedata = None
-#savedata = 'lgetkfcv_%s.nc' % exptname
+#savedata = 'getkfcv_%s.nc' % exptname
 nassim = 1320  # assimilation times to run
 nassim_spinup = 120
 
