@@ -225,16 +225,29 @@ if __name__ == "__main__":
         zsave[n] = model.timestep()
     zmean = zsave.mean(axis=0)
     zprime = zsave - zmean
+    for n in range(nspinup):
+        zspec = np.fft.rfft(zprime[n])
+        zspec_mag = (zspec*np.conjugate(zspec)).real
+        if not n:
+            zspec_mean = zspec_mag/nspinup
+        else:
+            zspec_mean += zspec_mag/nspinup
     print('mean = ',zmean.mean())
     print('stdev = ',np.sqrt((zprime**2).sum(axis=0)/(nspinup-1)).mean())
 
-    windowsteps = 24 # plot every windowsteps time steps
-
-    # plot animation
     import matplotlib
     matplotlib.use('qtagg')
     import matplotlib.pyplot as plt
     import matplotlib.animation as animation
+    plt.figure()
+    nx = model.model_size
+    wavenums = np.abs((nx*np.fft.fftfreq(nx))[0:(nx//2)+1])
+    plt.loglog(wavenums,zspec_mean,color='k')
+    plt.title('Z wavenumber spectra')
+    plt.savefig('zspec.png')
+
+    windowsteps = 24 # plot every windowsteps time steps
+    # plot animation
     fig = plt.figure(figsize=(10,6))
     ax = plt.gca()
     x = np.arange(model.model_size)
