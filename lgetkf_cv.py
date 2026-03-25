@@ -19,8 +19,9 @@ hcovlocal_scale = float(sys.argv[1])
 profile = False # turn on profiling?
 
 # if savedata not None, netcdf data will be saved with filename 'savedata'
+exptname = os.getenv('exptname','test')
 savedata = None
-#savedata = 'lgetkfcv_local%s.nc' % hcovlocal_scale
+#savedata = 'lgetkfcv_%s.nc' % exptname
 nassim = 1320  # assimilation times to run
 nassim_spinup = 120
 
@@ -240,5 +241,5 @@ if ncount:
         print('# ',wavenums[n],zspec_errmean[n],zspec_sprdmean[n])
     plt.loglog(wavenums,zspec_errmean,color='r')
     plt.loglog(wavenums,zspec_sprdmean,color='b')
-    plt.title('error (red) and spread (blue) l=%s' % hcovlocal_scale)
-    plt.savefig('errorspread_spectra_cv_local%s.png' % hcovlocal_scale)
+    plt.title('error (red) and spread (blue) %s' % exptname)
+    plt.savefig('errorspread_spectra_cv_%s.png' % exptname)
