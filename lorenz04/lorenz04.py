@@ -7,6 +7,7 @@ import numpy as np
 # Parameter	Nz	K	I	F	b	c
 # Harty et al	960	32	12	14	1	0.37
 # Lorenz 	960	32	12	15	10	2.5
+# Here          960     32      12      14      1       0.4
 # where b-> space_time_scale, c-> coupling, F-> forcing, I-> smooth_steps
 
 class Lorenz04:
@@ -206,12 +207,15 @@ class Lorenz04:
 # Example usage
 # ------------------------------------------------------------------
 if __name__ == "__main__":
+
+    # define model
     #model = Lorenz04(space_time_scale=10,forcing=15,coupling=2.5) # original settings from Lorenz paper
-    model = Lorenz04()
+    model = Lorenz04() # default settings.
 
     # random initial condition
     rs = np.random.RandomState(42)
     model.z = np.full(model.model_size, model.forcing) + rs.uniform(-1,1,size=model.model_size)
+
     # spinup
     nspinup = 12000 # 25 time units if dt=0.05/24
     import time
@@ -220,6 +224,8 @@ if __name__ == "__main__":
         z = model.timestep()
     t2 = time.time()
     print(t2-t1,'seconds to run spinup')
+
+    # run another nspinup time steps to compute climo mean,variance and variance spectrum.
     zsave = np.empty((nspinup,model.model_size),np.float64)
     for n in range(nspinup):
         zsave[n] = model.timestep()
@@ -235,6 +241,7 @@ if __name__ == "__main__":
     print('mean = ',zmean.mean())
     print('stdev = ',np.sqrt((zprime**2).sum(axis=0)/(nspinup-1)).mean())
 
+    # plot variance spectrum.
     import matplotlib
     matplotlib.use('qtagg')
     import matplotlib.pyplot as plt
@@ -246,6 +253,7 @@ if __name__ == "__main__":
     plt.title('Z wavenumber spectra')
     plt.savefig('zspec.png')
 
+    # run another nspinup time steps and show animation of solution
     windowsteps = 24 # plot every windowsteps time steps
     # plot animation
     fig = plt.figure(figsize=(10,6))
@@ -253,12 +261,10 @@ if __name__ == "__main__":
     x = np.arange(model.model_size)
     line = ax.plot(x,z)[0]
     ax.set_ylim(-20,20)
-
     def updatefig(*args):
         z = model.advance(timesteps=windowsteps)
         line.set_ydata(z)
         return line
-    
     # interval=0 means draw as fast as possible
     ani = animation.FuncAnimation(fig, updatefig, frames=500, interval=10, repeat=False)
     plt.show()
