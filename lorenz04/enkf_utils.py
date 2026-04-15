@@ -159,6 +159,8 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
             for ngrp in range(ngroups):
                 nanal_cv = [na + ngrp*nanals_per_group for na in range(nanals_per_group)]
                 hxprime_cv = np.delete(hxprime_local,nanal_cv,axis=0); xprime_cv = np.delete(xprime_b[:,n],nanal_cv,axis=0)
+                hxprime_cv_mean = hxprime_cv.mean(axis=0); xprime_cv_mean = xprime_cv.mean(axis=0)
+                hxprime_cv -= hxprime_cv_mean; xprime_cv -= xprime_cv_mean
                 wts_ensperts_cv = calcwts_perts((nanals-nanals//ngroups)-1, hxprime_local[nanal_cv], hxprime_cv, Rlocal, oberrvar_local, nerger=nerger)
                 xprime[nanal_cv,n] += np.dot(wts_ensperts_cv,xprime_cv)
             xprime_mean = xprime[:,n].mean(axis=0) 
@@ -195,16 +197,17 @@ def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covloc
         YbsqrtRinv = np.empty((nanalstot,nobs),np.float64)
         YbRinv = np.empty((nanalstot,nobs),np.float64)
         hpbht = np.empty((nlscales,nobs),np.float64)
-        rij = np.empty(nobs,np.float64)
         Rinvsqrt_nerger = np.empty_like(hpbht)
+        rij = np.empty(nobs,np.float64)
         for nl in range(nlscales):
             nanal1=nl*nanals_orig; nanal2=(nl+1)*nanals_orig
-            hpbht[nl] =  (hx[nanal1:nanal2]**2).sum(axis=0)/normfact**2
+            hpbht[nl] = (hx[nanal1:nanal2]**2).sum(axis=0)/normfact**2
             if nl == 0:
                rij = hpbht[0]
             else:
                rij += Rlocal[nl]*hpbht[nl]
         hpbht_tot = hpbht.sum(axis=0)
+        #hpbht_tot = ((hx/normfact)**2).sum(axis=0) # same as above for heaviside cutoff
         rij = rij/hpbht_tot
         for nl in range(nlscales):
             # CB's original version (no rij factor)
@@ -297,6 +300,8 @@ def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covloc
                 nanals_sub = np.nonzero(np.isin(nanal_index,nanal_cv))
                 hxprime_cv = np.delete(hxprime_local,nanals_sub,axis=0)
                 xprime_cv = np.delete(xprime[:,n],nanals_sub,axis=0)
+                hxprime_cv_mean = hxprime_cv.mean(axis=0); xprime_cv_mean = xprime_cv.mean(axis=0)
+                hxprime_cv -= hxprime_cv_mean; xprime_cv -= xprime_cv_mean
                 wts_ensperts_cv = calcwts_perts((nanals-nanals//ngroups)-1, nlscales, hxprime_orig_local[nanal_cv], hxprime_cv, oberrvar_local, Rlocal)
                 xprime_orig[nanal_cv,n] += np.dot(wts_ensperts_cv,xprime_cv)
             xprime_mean = xprime_orig[:,n].mean(axis=0) 
@@ -405,6 +410,8 @@ def getkf_bloc(xens, ominusf, oberrvar, sqrtcovlocal, indxob, ngroups=None):
         nanals_sub = np.nonzero(np.isin(nanal_index,nanal_cv))
         hxprime_cv = np.delete(hxprime2,nanals_sub,axis=0)
         xprime_cv = np.delete(xprime2,nanals_sub,axis=0)
+        hxprime_cv_mean = hxprime_cv.mean(axis=0); xprime_cv_mean = xprime_cv.mean(axis=0)
+        hxprime_cv -= hxprime_cv_mean; xprime_cv -= xprime_cv_mean
         wts_ensperts_cv = calcwts_perts((nanals-nanals//ngroups)-1, hxprime[nanal_cv], hxprime_cv, oberrvar)
         xprime[nanal_cv] += np.dot(wts_ensperts_cv,xprime_cv)
         xprime_mean = xprime.mean(axis=0) 
@@ -518,6 +525,8 @@ def getkfms_bloc(xens, xprime, ominusf, oberrvar, sqrtcovlocal, indxob, ngroups=
         nanals_sub = np.nonzero(np.isin(nanal_index,nanal_cv))
         hxprime_cv = np.delete(hxprime2,nanals_sub,axis=0)
         xprime_cv = np.delete(xprime2,nanals_sub,axis=0)
+        hxprime_cv_mean = hxprime_cv.mean(axis=0); xprime_cv_mean = xprime_cv.mean(axis=0)
+        hxprime_cv -= hxprime_cv_mean; xprime_cv -= xprime_cv_mean
         wts_ensperts_cv = calcwts_perts((nanals-nanals//ngroups)-1, hxprime[nanal_cv], hxprime_cv, oberrvar)
         xprime_orig[nanal_cv] += np.dot(wts_ensperts_cv,xprime_cv)
     xprime_mean = xprime_orig.mean(axis=0) 
@@ -650,6 +659,8 @@ def lgetkfms_bloc(xens, xprime, omf, oberrs, sqrtcovlocal_local, covlocal_ob, in
                 nanals_sub = np.nonzero(np.isin(nanal_index,nanal_cv))
                 hxprime_cv = np.delete(hxprime2_local,nanals_sub,axis=0)
                 xprime_cv = np.delete(xprime2_local[:,nmindist],nanals_sub,axis=0)
+                hxprime_cv_mean = hxprime_cv.mean(axis=0); xprime_cv_mean = xprime_cv.mean(axis=0)
+                hxprime_cv -= hxprime_cv_mean; xprime_cv -= xprime_cv_mean
                 wts_ensperts_cv = calcwts_perts((nanals-nanals//ngroups)-1, hxprime_local[nanal_cv], hxprime_cv, oberrvar_local)
                 xprime_orig[nanal_cv,n] += np.dot(wts_ensperts_cv,xprime_cv)
             xprime_mean = xprime_orig[:,n].mean(axis=0) 
