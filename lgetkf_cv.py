@@ -3,7 +3,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 from netCDF4 import Dataset
-import sys, time
+import sys, time, os
 from lorenz04 import Lorenz04, cartdist, lgetkf, gaspcohn
 
 if len(sys.argv) == 1:
@@ -67,8 +67,8 @@ print("# hcovlocal=%g nanals=%s ngroups=%s" %\
 # if fixednetwork=True, every nx//nobs grid point is observed (network moves 1 point every assim step).
 # otherwise, each ob time nobs ob locations are randomly sampled (without
 # replacement) from the model grid
-fixednetwork = False
-nobs = nx//12
+fixednetwork = True
+nobs = nx//4
 
 # nature run
 nc_truth = Dataset(filename_truth)
