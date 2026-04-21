@@ -82,8 +82,8 @@ print('# band_cutoffs=%s crossbandcov_facts=%s' % (repr(band_cutoffs),repr(cross
 # if fixednetwork=True, every nx//nobs grid point is observed.
 # otherwise, each ob time nobs ob locations are randomly sampled (without
 # replacement) from the model grid
-fixednetwork = False
-nobs = nx//12
+fixednetwork = True
+nobs = nx//4
 
 # nature run
 nc_truth = Dataset(filename_truth)
