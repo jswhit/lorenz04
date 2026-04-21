@@ -25,8 +25,8 @@ savedata = None
 nassim = 1320  # assimilation times to run
 nassim_spinup = 120
 
-nanals = 5 # ensemble members
-ngroups = nanals  # number of groups for cross-validation (ngroups=nanals//n is "leave n out")
+nanals = 256 # ensemble members
+ngroups = nanals//8  # number of groups for cross-validation (ngroups=nanals//n is "leave n out")
 
 oberrstdev = 1. # ob error standard deviation in K
 exptname = os.getenv('exptname','test')
@@ -68,7 +68,7 @@ print("# hcovlocal=%g nanals=%s ngroups=%s" %\
 # otherwise, each ob time nobs ob locations are randomly sampled (without
 # replacement) from the model grid
 fixednetwork = False
-nobs = nx//12
+nobs = nx//4
 
 # nature run
 nc_truth = Dataset(filename_truth)
