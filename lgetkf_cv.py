@@ -67,7 +67,7 @@ print("# hcovlocal=%g nanals=%s ngroups=%s" %\
 # if fixednetwork=True, every nx//nobs grid point is observed (network moves 1 point every assim step).
 # otherwise, each ob time nobs ob locations are randomly sampled (without
 # replacement) from the model grid
-fixednetwork = True
+fixednetwork = False
 nobs = nx//4
 
 # nature run
