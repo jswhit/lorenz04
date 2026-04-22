@@ -182,7 +182,6 @@ for ntime in range(nassim):
 
     fsprd = (zprime**2).sum(axis=0)/(nanals-1)
 
-    # compute forward operator on modulated ensemble.
     # hxens is ensemble in observation space.
     hxens = np.empty((nanals,nobs),np.float64)
 
@@ -236,7 +235,7 @@ for ntime in range(nassim):
     hxprime = np.empty((nanals*nlscales,nobs),np.float32)
     xprime = zprime.reshape(nanals*nlscales, nx)
     for nanal in range(nanals*nlscales):
-        hxprime[nanal] = xprime[nanal,indxob] # surface pv obs
+        hxprime[nanal] = xprime[nanal,indxob] 
 
     # EnKF update
     # (note zens contains unfiltered (original) ensemble, xprime has filtered perturbations separated into wave bands).

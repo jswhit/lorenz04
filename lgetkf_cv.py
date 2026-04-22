@@ -165,7 +165,6 @@ for ntime in range(nassim):
 
     fsprd = (zprime**2).sum(axis=0)/(nanals-1)
 
-    # compute forward operator on modulated ensemble.
     # hxens is ensemble in observation space.
     hxens = np.empty((nanals,nobs),np.float64)
 
