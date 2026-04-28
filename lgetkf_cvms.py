@@ -83,7 +83,7 @@ print('# band_cutoffs=%s crossbandcov_facts=%s' % (repr(band_cutoffs),repr(cross
 # otherwise, each ob time nobs ob locations are randomly sampled (without
 # replacement) from the model grid
 fixednetwork = False
-nobs = nx//4
+nobs = nx//10
 
 # nature run
 nc_truth = Dataset(filename_truth)
@@ -232,6 +232,18 @@ for ntime in range(nassim):
     zens_filtered = np.asarray(zens_filtered_lst)
     zprime = np.dot(zens_filtered.T,crossband_covmat).T
 
+    zstdev = np.zeros((nlscales,nx), zprime.dtype)
+    for nl in range(nlscales):
+        zstdev[nl] = (zprime[nl]**2).sum(axis=0)/(nanals-1)
+    # scale factor to ensure sum of variances in wavebands equals total variance of unfiltered field
+    scalefact = np.sqrt(zsprd_b.mean()/(zstdev.sum(axis=0)).mean())
+    zprime = scalefact*zprime
+    #print((zstdev.sum(axis=0)).mean(), zsprd_b.mean(), scalefact)
+    #for nl in range(nlscales):
+    #    zstdev[nl] = (zprime[nl]**2).sum(axis=0)/(nanals-1)
+    #print((zstdev.sum(axis=0)).mean(), zsprd_b.mean(), scalefact)
+    #raise SystemExit
+
     hxprime = np.empty((nanals*nlscales,nobs),np.float32)
     xprime = zprime.reshape(nanals*nlscales, nx)
     for nanal in range(nanals*nlscales):
@@ -239,7 +251,7 @@ for ntime in range(nassim):
 
     # EnKF update
     # (note zens contains unfiltered (original) ensemble, xprime has filtered perturbations separated into wave bands).
-    zens = lgetkf_ms(nlscales,zens,xprime,hxprime,hxprime_orig,zob-hxensmean_b,oberrvar,covlocal_tmp,ngroups=ngroups)
+    zens = lgetkf_ms(nlscales,zens,xprime,hxprime,hxprime_orig,zob-hxensmean_b,oberrvar,covlocal_tmp,ngroups=ngroups,recen=True)
 
     t2 = time.time()
     if profile: print('cpu time for EnKF update',t2-t1)

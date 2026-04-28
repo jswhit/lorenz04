@@ -79,7 +79,7 @@ print('# band_cutoffs=%s crossbandcov_facts=%s' % (repr(band_cutoffs),repr(cross
 # otherwise, each ob time nobs ob locations are randomly sampled (without
 # replacement) from the model grid
 fixednetwork = False
-nobs = nx//12
+nobs = nx//10
 
 # nature run
 nc_truth = Dataset(filename_truth)
@@ -272,7 +272,6 @@ for ntime in range(nassim):
 
     fsprd = (zprime**2).sum(axis=0)/(nanals-1)
 
-    # compute forward operator on modulated ensemble.
     # hxens is ensemble in observation space.
     hxens = np.empty((nanals,nobs),np.float64)
 
@@ -322,6 +321,18 @@ for ntime in range(nassim):
     zprime = np.empty((nanals, nlscales, nx),np.float32)
     for nlscale in range(nlscales):
         zprime[:,nlscale,:] = zens_filtered_lst[nlscale]
+
+    zstdev = np.zeros((nlscales,nx), zprime.dtype)
+    for nl in range(nlscales):
+        zstdev[nl] = (zprime[:,nl,:]**2).sum(axis=0)/(nanals-1)
+    # scale factor to ensure sum of variances in wavebands equals total variance of unfiltered field
+    scalefact = np.sqrt(zsprd_b.mean()/(zstdev.sum(axis=0)).mean())
+    zprime = scalefact*zprime
+    #print((zstdev.sum(axis=0)).mean(), zsprd_b.mean(), scalefact)
+    #for nl in range(nlscales):
+    #    zstdev[nl] = (zprime[:,nl,:]**2).sum(axis=0)/(nanals-1)
+    #print((zstdev.sum(axis=0)).mean(), zsprd_b.mean(), scalefact)
+    #raise SystemExit
 
     # GETKF update with b localization.
     zens = lgetkfms_bloc(zens, zprime, zob-hxensmean_b, oberrvar, sqrtcovlocal_local, covlocal_ob, indxob, covlocal_model[0], ngroups=ngroups)

@@ -68,7 +68,7 @@ print("# hcovlocal=%g nanals=%s ngroups=%s" %\
 # otherwise, each ob time nobs ob locations are randomly sampled (without
 # replacement) from the model grid
 fixednetwork = False
-nobs = nx//4
+nobs = nx//10
 
 # nature run
 nc_truth = Dataset(filename_truth)

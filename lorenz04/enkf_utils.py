@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.linalg import eigh
+from scipy.linalg import eigh, lapack
 
 lapack_driver='evd'
 
@@ -169,7 +169,7 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
 
     return xens
 
-def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covlocal, ngroups=None):
+def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covlocal, ngroups=None, recen=True):
 
     """returns ensemble updated by LGETKF with cross-validation and multi-scale R localization"""
 
@@ -235,10 +235,12 @@ def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covloc
         if nobs >= hx.shape[0]:
             a = np.dot(YbsqrtRinv,YbsqrtRinv.T)
             evals, evecs = eigh(a,driver=lapack_driver)
+            #evals, evecs, info = lapack.dsyevd(a)
             evals = evals.clip(min=np.finfo(evals.dtype).eps)
         else:
             a = np.dot(YbsqrtRinv.T,YbsqrtRinv)
             evals, evecs = eigh(a,driver=lapack_driver)
+            #evals, evecs, info = lapack.dsyevd(a)
             evals = evals.clip(min=np.finfo(evals.dtype).eps)
             evecs = np.dot(YbsqrtRinv,evecs/np.sqrt(evals))
         gamma_inv = 1./evals
@@ -265,10 +267,12 @@ def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covloc
         if nobs >= hx.shape[0]:
             a = np.dot(YbsqrtRinv,YbsqrtRinv.T)
             evals, evecs, = eigh(a)
+            #evals, evecs, info = lapack.dsyevd(a)
             evals = evals.clip(min=np.finfo(evals.dtype).eps)
         else:
             a = np.dot(YbsqrtRinv.T,YbsqrtRinv)
             evals, evecs, = eigh(a)
+            #evals, evecs, info = lapack.dsyevd(a)
             evals = evals.clip(min=np.finfo(evals.dtype).eps)
             evecs = np.dot(YbsqrtRinv,evecs/np.sqrt(evals))
         # gammapI used in calculation of posterior cov in ensemble space
@@ -300,8 +304,9 @@ def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covloc
                 nanals_sub = np.nonzero(np.isin(nanal_index,nanal_cv))
                 hxprime_cv = np.delete(hxprime_local,nanals_sub,axis=0)
                 xprime_cv = np.delete(xprime[:,n],nanals_sub,axis=0)
-                hxprime_cv_mean = hxprime_cv.mean(axis=0); xprime_cv_mean = xprime_cv.mean(axis=0)
-                hxprime_cv -= hxprime_cv_mean; xprime_cv -= xprime_cv_mean
+                if recen:
+                    hxprime_cv_mean = hxprime_cv.mean(axis=0); xprime_cv_mean = xprime_cv.mean(axis=0)
+                    hxprime_cv -= hxprime_cv_mean; xprime_cv -= xprime_cv_mean
                 wts_ensperts_cv = calcwts_perts((nanals-nanals//ngroups)-1, nlscales, hxprime_orig_local[nanal_cv], hxprime_cv, oberrvar_local, Rlocal)
                 xprime_orig[nanal_cv,n] += np.dot(wts_ensperts_cv,xprime_cv)
             xprime_mean = xprime_orig[:,n].mean(axis=0) 

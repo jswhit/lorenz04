@@ -79,7 +79,7 @@ print('# band_cutoffs=%s crossbandcov_facts=%s' % (repr(band_cutoffs),repr(cross
 # otherwise, each ob time nobs ob locations are randomly sampled (without
 # replacement) from the model grid
 fixednetwork = False
-nobs = nx//12
+nobs = nx//10
 
 # nature run
 nc_truth = Dataset(filename_truth)
@@ -212,7 +212,6 @@ for ntime in range(nassim):
 
     fsprd = (zprime**2).sum(axis=0)/(nanals-1)
 
-    # compute forward operator on modulated ensemble.
     # hxens is ensemble in observation space.
     hxens = np.empty((nanals,nobs),np.float64)
 
