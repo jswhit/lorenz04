@@ -196,7 +196,7 @@ def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covloc
         normfact = np.array(np.sqrt(ndgf),dtype=np.float64)
         YbsqrtRinv = np.empty((nanalstot,nobs),np.float64)
         YbRinv = np.empty((nanalstot,nobs),np.float64)
-        hpbht = np.zeros((nlscales,nobs),np.float64)
+        hpbht = np.empty((nlscales,nobs),np.float64)
         Rinvsqrt_nerger = np.empty_like(hpbht)
         for nl in range(nlscales):
             nanal1=nl*nanals_orig; nanal2=(nl+1)*nanals_orig
