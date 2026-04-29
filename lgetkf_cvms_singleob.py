@@ -32,7 +32,8 @@ for i in range(nlscales):
         if j != i:
             crossband_covmat[j,i] = crossbandcov_facts[np.abs(i-j)-1] 
 
-filename_in = 'getkf_cv_150_500mem.nc'
+filename_in = 'getkf_cv_nobsx10ran_local100.0.nc'
+#filename_in = 'getkf_cv_150_500mem.nc'
 
 oberrstdev = 1. # ob error standard deviation in K
 ncin = Dataset(filename_in)
@@ -51,9 +52,9 @@ zensfull = ncin['z_b'][ntin]
 zensmean_b = zens.mean(axis=0)
 zensmean_b_full = zensfull.mean(axis=0)
 
-#model = Lorenz04(z=zens[0],model_size=ncin.model_size,\
-#forcing=ncin.forcing,dt=ncin.dt,space_time_scale=ncin.space_time_scale,\
-#K=ncin.K,smooth_steps=ncin.smooth_steps)
+model = Lorenz04(z=zens[0],model_size=ncin.model_size,\
+forcing=ncin.forcing,dt=ncin.dt,space_time_scale=ncin.space_time_scale,\
+K=ncin.K,smooth_steps=ncin.smooth_steps)
 
 print("# hcovlocal_scales=%s nanals=%s ngroups=%s" %\
         (repr(hcovlocal_scales),nanals,ngroups))
@@ -64,7 +65,7 @@ kmax = (nx//2)+1
 
 oberrvar = oberrstdev**2*np.ones(nobs,np.float64)
 covlocal = np.empty(nx,np.float64)
-lscale_full = hcovlocal_scales[0]*10
+lscale_full = ncin.hcovlocal_scale
 
 # full model-space horizontal localization matrix (and it's square root)
 covlocal_model = np.empty((nx,nx),np.float64)
@@ -156,7 +157,7 @@ else:
             # for 2 scales and band_cutoff=999, use model filter
             zfilt = np.empty_like(zens)
             for nanal in range(nanals):
-                zfilt[nanal], _ = models[nanal].z2xy(zprime[nanal])
+                zfilt[nanal], _ = model.z2xy(zprime[nanal])
         else:
             zfiltspec = np.where(wavenums[np.newaxis,...] < cutoff, zspec, 0.+0.j)
             zfilt = np.fft.irfft(zfiltspec)
@@ -175,6 +176,18 @@ else:
     #raise SystemExit
 zens_filtered = np.asarray(zens_filtered_lst)
 zprime = np.dot(zens_filtered.T,crossband_covmat).T
+
+zstdev = np.zeros((nlscales,nx), zprime.dtype)
+for nl in range(nlscales):
+    zstdev[nl] = (zprime[nl]**2).sum(axis=0)/(nanals-1)
+# scale factor to ensure sum of variances in wavebands equals total variance of unfiltered field
+scalefact = np.sqrt(zsprd_b.mean()/(zstdev.sum(axis=0)).mean())
+zprime = scalefact*zprime
+#print((zstdev.sum(axis=0)).mean(), zsprd_b.mean(), scalefact)
+#for nl in range(nlscales):
+#    zstdev[nl] = (zprime[nl]**2).sum(axis=0)/(nanals-1)
+#print((zstdev.sum(axis=0)).mean(), zsprd_b.mean(), scalefact)
+#raise SystemExit
 
 hxprime = np.empty((nanals*nlscales,nobs),np.float32)
 xprime = zprime.reshape(nanals*nlscales, nx)
