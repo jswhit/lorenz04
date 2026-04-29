@@ -196,18 +196,16 @@ def lgetkf_ms(nlscales, xens, xprime, hxprime, hxprime_orig, omf, oberrs, covloc
         normfact = np.array(np.sqrt(ndgf),dtype=np.float64)
         YbsqrtRinv = np.empty((nanalstot,nobs),np.float64)
         YbRinv = np.empty((nanalstot,nobs),np.float64)
-        hpbht = np.empty((nlscales,nobs),np.float64)
+        hpbht = np.zeros((nlscales,nobs),np.float64)
         Rinvsqrt_nerger = np.empty_like(hpbht)
-        rij = np.empty(nobs,np.float64)
         for nl in range(nlscales):
             nanal1=nl*nanals_orig; nanal2=(nl+1)*nanals_orig
-            hpbht[nl] = (hx[nanal1:nanal2]**2).sum(axis=0)/normfact**2
-            if nl == 0:
-               rij = hpbht[0]
-            else:
-               rij += Rlocal[nl]*hpbht[nl]
+            hpbht[nl] = ((hx[nanal1:nanal2]/normfact)**2).sum(axis=0)
+        rij = hpbht[0]
+        for nl in range(1,nlscales):
+            rij = rij + Rlocal[nl]*hpbht[nl]
         hpbht_tot = hpbht.sum(axis=0)
-        #hpbht_tot = ((hx/normfact)**2).sum(axis=0) # same as above for heaviside cutoff
+        #hpbht_tot = ((hx/normfact)**2).sum(axis=0) # should be same as above
         rij = rij/hpbht_tot
         for nl in range(nlscales):
             # CB's original version (no rij factor)
