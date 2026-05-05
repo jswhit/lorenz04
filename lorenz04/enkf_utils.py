@@ -97,7 +97,7 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
         # (in Bishop paper HZ is nobs, nanals, here is it nanals, nobs)
         # normalize so dot product is covariance
         YbsqrtRinv, YbRinv = getYbvecs(hx,Rlocal,oberrvar,nerger=nerger)
-        if nobs >= hx.shape[0]:
+        if nobs >= nanals:
             a = np.dot(YbsqrtRinv,YbsqrtRinv.T)
             evals, evecs = eigh(a,driver=lapack_driver)
             evals = evals.clip(min=np.finfo(evals.dtype).eps)
@@ -120,7 +120,7 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
     def calcwts_perts(hx_orig, hx, Rlocal, oberrvar,nerger=True):
         # hx_orig contains the ensemble pert for the witheld member
         nanals, nobs = hx.shape
-        ndgf = nanals = 1
+        ndgf = nanals - 1
         normfact = np.array(np.sqrt(ndgf),dtype=np.float64)
         # gain-form etkf solution
         # HZ^T = hxens * R**-1/2
@@ -128,7 +128,7 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
         # (in Bishop paper HZ is nobs, nanals, here is it nanals, nobs)
         # normalize so dot product is covariance
         YbsqrtRinv, YbRinv = getYbvecs(hx,Rlocal,oberrvar,nerger=nerger)
-        if nobs >= hx.shape[0]:
+        if nobs >= nanals:
             a = np.dot(YbsqrtRinv,YbsqrtRinv.T)
             evals, evecs = eigh(a,driver=lapack_driver)
             evals = evals.clip(min=np.finfo(evals.dtype).eps)
@@ -168,6 +168,7 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
             xprime_mean = xprime[:,n].mean(axis=0) 
             xprime[:,n] -= xprime_mean # ensure zero mean
             xens[:,n] = xmean[n]+xprime[:,n]
+            raise SystemExit
 
     return xens
 
