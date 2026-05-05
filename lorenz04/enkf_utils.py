@@ -410,6 +410,8 @@ def getkf_bloc(xens, ominusf, oberrvar, sqrtcovlocal, indxob, ngroups=None):
         hxprime[nanal] = xprime[nanal,indxob]
     for nanal in range(nanals2):
         hxprime2[nanal] = xprime2[nanal,indxob]
+    #print((hxprime**2).sum(axis=0)/(nanals-1))
+    #print((hxprime2**2).sum(axis=0)/(nanals-1)) # should be same as above
     wts_ensmean = calcwts_mean(nanals-1, hxprime2, oberrvar, ominusf)
     xmean += np.dot(wts_ensmean,xprime2)
     # update sub-ensemble groups, using cross validation.
