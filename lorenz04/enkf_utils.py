@@ -87,9 +87,9 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
             YbRinv = hx*(Rlocal/oberrvar)/normfact
         return YbsqrtRinv, YbRinv
 
-    def calcwts_mean( hx, Rlocal, oberrvar, ominusf, nerger=True):
-        nanals, nobs = hx.shape[1]
-        ndgf = nanals-1
+    def calcwts_mean(hx, Rlocal, oberrvar, ominusf, nerger=True):
+        nanals, nobs = hx.shape
+        ndgf = nanals - 1
         normfact = np.array(np.sqrt(ndgf),dtype=np.float64)
         # gain-form etkf solution
         # HZ^T = hxens * R**-1/2
@@ -117,9 +117,10 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
         pa = np.dot(evecs/gammapI[np.newaxis,:],evecs.T)
         return np.dot(pa, np.dot(YbRinv,ominusf))/normfact
 
-    def calcwts_perts(ndgf, hx_orig, hx, Rlocal, oberrvar,nerger=True):
+    def calcwts_perts(hx_orig, hx, Rlocal, oberrvar,nerger=True):
         # hx_orig contains the ensemble pert for the witheld member
-        nobs = hx.shape[1]
+        nanals, nobs = hx.shape
+        ndgf = nanals = 1
         normfact = np.array(np.sqrt(ndgf),dtype=np.float64)
         # gain-form etkf solution
         # HZ^T = hxens * R**-1/2
@@ -154,7 +155,7 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
             oberrvar_local = oberrs[mask]
             ominusf_local = (obs-hxmean)[mask]
             hxprime_local = hxprime[:,mask]
-            wts_ensmean = calcwts_mean(nanals-1, hxprime_local, Rlocal, oberrvar_local, ominusf_local, nerger=nerger)
+            wts_ensmean = calcwts_mean(hxprime_local, Rlocal, oberrvar_local, ominusf_local, nerger=nerger)
             xmean[n] += np.dot(wts_ensmean,xprime_b[:,n])
             # update sub-ensemble groups, using cross validation.
             for ngrp in range(ngroups):
@@ -162,7 +163,7 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
                 hxprime_cv = np.delete(hxprime_local,nanal_cv,axis=0); xprime_cv = np.delete(xprime_b[:,n],nanal_cv,axis=0)
                 hxprime_cv_mean = hxprime_cv.mean(axis=0); xprime_cv_mean = xprime_cv.mean(axis=0)
                 hxprime_cv -= hxprime_cv_mean; xprime_cv -= xprime_cv_mean
-                wts_ensperts_cv = calcwts_perts((nanals-nanals//ngroups)-1, hxprime_local[nanal_cv], hxprime_cv, Rlocal, oberrvar_local, nerger=nerger)
+                wts_ensperts_cv = calcwts_perts(hxprime_local[nanal_cv], hxprime_cv, Rlocal, oberrvar_local, nerger=nerger)
                 xprime[nanal_cv,n] += np.dot(wts_ensperts_cv,xprime_cv)
             xprime_mean = xprime[:,n].mean(axis=0) 
             xprime[:,n] -= xprime_mean # ensure zero mean
