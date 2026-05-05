@@ -168,7 +168,6 @@ def lgetkf(xens, hxens, obs, oberrs, covlocal, nerger=True, ngroups=None):
             xprime_mean = xprime[:,n].mean(axis=0) 
             xprime[:,n] -= xprime_mean # ensure zero mean
             xens[:,n] = xmean[n]+xprime[:,n]
-            raise SystemExit
 
     return xens
 
